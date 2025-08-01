@@ -450,6 +450,105 @@
       </div>
     </div>
 
+    <!-- Basic Redis Comparison -->
+    <div class="glass glass-hover p-4 sm:p-6 lg:p-8 rounded-2xl mb-6">
+      <div class="flex items-center justify-between mb-6 cursor-pointer" onclick="toggleSection('basicRedisComparison')">
+        <h2 class="text-xl sm:text-2xl font-semibold text-gray-100">⚠️ Basic Redis (No Retry Strategy) - Problems Demo</h2>
+        <span id="basicRedisComparisonToggle" class="text-gray-400 text-xl">▼</span>
+      </div>
+      
+      <div id="basicRedisComparisonContent" class="hidden">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          <button onclick="connectBasicRedis()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105">
+            🔌 Connect Basic Redis
+          </button>
+          <button onclick="simulateBasicRedisCrash()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105">
+            💥 Crash Test (Basic)
+          </button>
+          <button onclick="simulateBasicRedisRecovery()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105">
+            🔄 Recovery Test (Basic)
+          </button>
+        </div>
+        
+        <!-- Basic Redis Status -->
+        <div class="mb-6">
+          <h3 class="text-lg font-medium text-gray-100 mb-3">Basic Redis Status</h3>
+          <div id="basicRedisStatus" class="bg-gray-800 rounded-lg p-4">
+            <div class="text-gray-400">Loading basic Redis status...</div>
+          </div>
+        </div>
+
+        <!-- Basic Redis Problems -->
+        <div class="mb-6">
+          <h3 class="text-lg font-medium text-red-400 mb-3">❌ Problems with Basic Redis</h3>
+          <div class="bg-red-900 bg-opacity-20 border border-red-600 rounded-lg p-4">
+            <ul class="text-red-300 space-y-2 text-sm">
+              <li>• <strong>No retry strategy:</strong> Connection failures cause immediate errors</li>
+              <li>• <strong>No circuit breaker:</strong> No protection against infinite retry loops</li>
+              <li>• <strong>No auto-recovery:</strong> No automatic reconnection when Redis comes back</li>
+              <li>• <strong>No stuck retry detection:</strong> No mechanism to detect and reset stuck connections</li>
+              <li>• <strong>Limited error handling:</strong> Poor user experience during Redis outages</li>
+              <li>• <strong>No health checks:</strong> No monitoring or alerting capabilities</li>
+              <li>• <strong>No graceful degradation:</strong> No fallback mechanism when Redis is down</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Comparison Table -->
+        <div class="mb-6">
+          <h3 class="text-lg font-medium text-gray-100 mb-3">📊 Enhanced vs Basic Redis Comparison</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-gray-600">
+                  <th class="text-left p-2 text-gray-300">Feature</th>
+                  <th class="text-left p-2 text-green-400">Enhanced Redis</th>
+                  <th class="text-left p-2 text-red-400">Basic Redis</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="border-b border-gray-700">
+                  <td class="p-2 text-gray-300">Retry Strategy</td>
+                  <td class="p-2 text-green-400">✅ Exponential backoff with jitter</td>
+                  <td class="p-2 text-red-400">❌ None</td>
+                </tr>
+                <tr class="border-b border-gray-700">
+                  <td class="p-2 text-gray-300">Circuit Breaker</td>
+                  <td class="p-2 text-green-400">✅ Prevents infinite retries</td>
+                  <td class="p-2 text-red-400">❌ No protection</td>
+                </tr>
+                <tr class="border-b border-gray-700">
+                  <td class="p-2 text-gray-300">Auto-Recovery</td>
+                  <td class="p-2 text-green-400">✅ Automatic reconnection</td>
+                  <td class="p-2 text-red-400">❌ Manual intervention required</td>
+                </tr>
+                <tr class="border-b border-gray-700">
+                  <td class="p-2 text-gray-300">Stuck Retry Detection</td>
+                  <td class="p-2 text-green-400">✅ Detects and resets stuck connections</td>
+                  <td class="p-2 text-red-400">❌ No detection</td>
+                </tr>
+                <tr class="border-b border-gray-700">
+                  <td class="p-2 text-gray-300">Health Checks</td>
+                  <td class="p-2 text-green-400">✅ Regular health monitoring</td>
+                  <td class="p-2 text-red-400">❌ No monitoring</td>
+                </tr>
+                <tr class="border-b border-gray-700">
+                  <td class="p-2 text-gray-300">Graceful Degradation</td>
+                  <td class="p-2 text-green-400">✅ Fallback to MySQL</td>
+                  <td class="p-2 text-red-400">❌ Immediate failures</td>
+                </tr>
+                <tr class="border-b border-gray-700">
+                  <td class="p-2 text-gray-300">User Experience</td>
+                  <td class="p-2 text-green-400">✅ Seamless operation</td>
+                  <td class="p-2 text-red-400">❌ Poor during outages</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Container Logs -->
     <div class="glass glass-hover p-4 sm:p-6 lg:p-8 rounded-2xl mb-6">
       <div class="flex items-center justify-between mb-6 cursor-pointer" onclick="toggleSection('containerLogs')">

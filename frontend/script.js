@@ -2041,4 +2041,202 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
   }
-}); 
+});
+
+// Basic Redis functions for comparison
+async function connectBasicRedis() {
+  const btn = document.querySelector('button[onclick="connectBasicRedis()"]');
+  const originalText = btn.textContent;
+  
+  try {
+    btn.textContent = '🔌 Connecting...';
+    btn.disabled = true;
+    btn.className = 'bg-blue-700 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform scale-95 shadow-lg cursor-not-allowed';
+    
+    const response = await fetch('http://localhost:8000/basic-redis/connect', { method: 'POST' });
+    const data = await response.json();
+    
+    if (response.ok) {
+      btn.textContent = '✅ Connected!';
+      btn.className = 'bg-green-600 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform scale-95 shadow-lg';
+      
+      // Update status
+      updateBasicRedisStatus();
+      
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.disabled = false;
+        btn.className = 'bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105';
+      }, 2000);
+    }
+  } catch (error) {
+    console.error('Basic Redis connection failed:', error);
+    btn.textContent = '❌ Failed';
+    btn.className = 'bg-red-600 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform scale-95 shadow-lg';
+    
+    setTimeout(() => {
+      btn.textContent = originalText;
+      btn.disabled = false;
+      btn.className = 'bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105';
+    }, 2000);
+  }
+}
+
+async function simulateBasicRedisCrash() {
+  const btn = document.querySelector('button[onclick="simulateBasicRedisCrash()"]');
+  const originalText = btn.textContent;
+  
+  try {
+    btn.textContent = '💥 Crashing...';
+    btn.disabled = true;
+    btn.className = 'bg-red-700 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform scale-95 shadow-lg cursor-not-allowed';
+    
+    const response = await fetch('http://localhost:8000/basic-redis/simulate-crash', { method: 'POST' });
+    const data = await response.json();
+    
+    if (response.ok) {
+      btn.textContent = '✅ Crashed!';
+      btn.className = 'bg-green-600 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform scale-95 shadow-lg';
+      
+      // Show results
+      showBasicRedisResults(data, 'Crash Simulation');
+      
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.disabled = false;
+        btn.className = 'bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105';
+      }, 2000);
+    }
+  } catch (error) {
+    console.error('Basic Redis crash simulation failed:', error);
+    btn.textContent = '❌ Failed';
+    btn.className = 'bg-gray-600 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform scale-95 shadow-lg';
+    
+    setTimeout(() => {
+      btn.textContent = originalText;
+      btn.disabled = false;
+      btn.className = 'bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105';
+    }, 2000);
+  }
+}
+
+async function simulateBasicRedisRecovery() {
+  const btn = document.querySelector('button[onclick="simulateBasicRedisRecovery()"]');
+  const originalText = btn.textContent;
+  
+  try {
+    btn.textContent = '🔄 Recovering...';
+    btn.disabled = true;
+    btn.className = 'bg-green-700 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform scale-95 shadow-lg cursor-not-allowed';
+    
+    const response = await fetch('http://localhost:8000/basic-redis/simulate-recovery', { method: 'POST' });
+    const data = await response.json();
+    
+    if (response.ok) {
+      btn.textContent = '✅ Recovered!';
+      btn.className = 'bg-green-600 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform scale-95 shadow-lg';
+      
+      // Show results
+      showBasicRedisResults(data, 'Recovery Simulation');
+      
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.disabled = false;
+        btn.className = 'bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105';
+      }, 2000);
+    }
+  } catch (error) {
+    console.error('Basic Redis recovery simulation failed:', error);
+    btn.textContent = '❌ Failed';
+    btn.className = 'bg-gray-600 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform scale-95 shadow-lg';
+    
+    setTimeout(() => {
+      btn.textContent = originalText;
+      btn.disabled = false;
+      btn.className = 'bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105';
+    }, 2000);
+  }
+}
+
+async function updateBasicRedisStatus() {
+  try {
+    const response = await fetch('http://localhost:8000/basic-redis/health');
+    const data = await response.json();
+    
+    const statusDiv = document.getElementById('basicRedisStatus');
+    statusDiv.innerHTML = `
+      <div class="grid grid-cols-2 gap-4 text-sm">
+        <div>
+          <span class="text-gray-400">Status:</span>
+          <span class="text-${data.isConnected ? 'green' : 'red'}-400 font-medium">${data.redisStatus}</span>
+        </div>
+        <div>
+          <span class="text-gray-400">Connected:</span>
+          <span class="text-${data.isConnected ? 'green' : 'red'}-400 font-medium">${data.isConnected ? 'Yes' : 'No'}</span>
+        </div>
+        <div>
+          <span class="text-gray-400">Connection Attempts:</span>
+          <span class="text-yellow-400 font-medium">${data.connectionAttempts}</span>
+        </div>
+        <div>
+          <span class="text-gray-400">Overall Status:</span>
+          <span class="text-${data.status === 'healthy' ? 'green' : 'red'}-400 font-medium">${data.status}</span>
+        </div>
+      </div>
+      <div class="mt-4">
+        <h4 class="text-red-400 font-medium mb-2">Problems:</h4>
+        <ul class="text-red-300 text-xs space-y-1">
+          ${data.problems.map(problem => `<li>• ${problem}</li>`).join('')}
+        </ul>
+      </div>
+    `;
+  } catch (error) {
+    console.error('Failed to update basic Redis status:', error);
+    document.getElementById('basicRedisStatus').innerHTML = `
+      <div class="text-red-400">Failed to load basic Redis status: ${error.message}</div>
+    `;
+  }
+}
+
+function showBasicRedisResults(data, simulationType) {
+  const resultsHtml = `
+    <div class="bg-gray-800 rounded-lg p-4 mt-4">
+      <h4 class="text-lg font-medium text-gray-100 mb-3">${simulationType} Results</h4>
+      
+      <div class="mb-4">
+        <h5 class="text-yellow-400 font-medium mb-2">Test Results:</h5>
+        <div class="space-y-2">
+          ${data.testResults.map(result => `
+            <div class="flex items-center space-x-2">
+              <span class="text-${result.status === 'success' ? 'green' : 'red'}-400">${result.status === 'success' ? '✅' : '❌'}</span>
+              <span class="text-gray-300">${result.operation}:</span>
+              <span class="text-${result.status === 'success' ? 'green' : 'red'}-400">${result.message}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      
+      <div class="mb-4">
+        <h5 class="text-red-400 font-medium mb-2">Problems:</h5>
+        <ul class="text-red-300 text-sm space-y-1">
+          ${data.problems.map(problem => `<li>• ${problem}</li>`).join('')}
+        </ul>
+      </div>
+      
+      <div>
+        <h5 class="text-orange-400 font-medium mb-2">Impact:</h5>
+        <ul class="text-orange-300 text-sm space-y-1">
+          ${data.impact.map(impact => `<li>• ${impact}</li>`).join('')}
+        </ul>
+      </div>
+    </div>
+  `;
+  
+  // Add results to the basic Redis comparison section
+  const container = document.getElementById('basicRedisComparisonContent');
+  const existingResults = container.querySelector('.bg-gray-800');
+  if (existingResults) {
+    existingResults.remove();
+  }
+  container.insertAdjacentHTML('beforeend', resultsHtml);
+} 

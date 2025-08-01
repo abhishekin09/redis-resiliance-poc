@@ -7,6 +7,10 @@ const Docker = require('dockerode');
 // Import utility modules
 const redisManager = require('./redis-utils');
 const recoveryManager = require('./recovery-utils');
+const BasicRedisManager = require('./basic-redis-utils');
+
+// Initialize basic Redis manager for comparison
+const basicRedisManager = new BasicRedisManager();
 
 // Initialize Docker client
 const docker = new Docker({
@@ -1231,6 +1235,277 @@ app.post('/force-reset', async (req, res) => {
     console.error('[❌] Error during force reset:', error);
     res.status(500).json({
       error: 'Failed to force reset',
+      message: error.message
+    });
+  }
+});
+
+// Basic Redis endpoints for comparison
+app.post('/basic-redis/connect', async (req, res) => {
+  try {
+    console.log('[🔌] Basic Redis connect requested...');
+    basicRedisManager.connect();
+    res.json({ 
+      message: 'Basic Redis connection initiated',
+      status: basicRedisManager.getStatus()
+    });
+  } catch (error) {
+    console.error('[❌] Error connecting basic Redis:', error);
+    res.status(500).json({
+      error: 'Failed to connect basic Redis',
+      message: error.message
+    });
+  }
+});
+
+app.post('/basic-redis/disconnect', async (req, res) => {
+  try {
+    console.log('[🔌] Basic Redis disconnect requested...');
+    await basicRedisManager.disconnect();
+    res.json({ 
+      message: 'Basic Redis disconnected',
+      status: basicRedisManager.getStatus()
+    });
+  } catch (error) {
+    console.error('[❌] Error disconnecting basic Redis:', error);
+    res.status(500).json({
+      error: 'Failed to disconnect basic Redis',
+      message: error.message
+    });
+  }
+});
+
+app.get('/basic-redis/health', (req, res) => {
+  const uptime = process.uptime();
+  const redisStatus = basicRedisManager.getStatus();
+  const connectionAttempts = basicRedisManager.getConnectionAttempts();
+  const isConnected = basicRedisManager.isConnected();
+  
+  res.json({
+    service: 'Basic Redis (No Retry Strategy)',
+    version: '1.0.0',
+    uptime: uptime,
+    redisStatus: redisStatus,
+    connectionAttempts: connectionAttempts,
+    isConnected: isConnected,
+    status: isConnected ? 'healthy' : 'degraded',
+    problems: basicRedisManager.getRetryInfo().problems,
+    impact: basicRedisManager.getRetryInfo().impact
+  });
+});
+
+app.get('/basic-redis/retry-info', (req, res) => {
+  res.json(basicRedisManager.getRetryInfo());
+});
+
+app.get('/basic-redis/status', (req, res) => {
+  res.json(basicRedisManager.getDetailedStatus());
+});
+
+// Basic Redis operations for testing
+app.post('/basic-redis/set/:key', async (req, res) => {
+  try {
+    const { key } = req.params;
+    const { value, ttl } = req.body;
+    
+    await basicRedisManager.set(key, value, ttl);
+    res.json({ 
+      message: `Key ${key} set successfully`,
+      status: basicRedisManager.getStatus()
+    });
+  } catch (error) {
+    console.error('[❌] Error setting key in basic Redis:', error);
+    res.status(500).json({
+      error: 'Failed to set key in basic Redis',
+      message: error.message,
+      status: basicRedisManager.getStatus()
+    });
+  }
+});
+
+app.get('/basic-redis/get/:key', async (req, res) => {
+  try {
+    const { key } = req.params;
+    const value = await basicRedisManager.get(key);
+    res.json({ 
+      key: key,
+      value: value,
+      status: basicRedisManager.getStatus()
+    });
+  } catch (error) {
+    console.error('[❌] Error getting key from basic Redis:', error);
+    res.status(500).json({
+      error: 'Failed to get key from basic Redis',
+      message: error.message,
+      status: basicRedisManager.getStatus()
+    });
+  }
+});
+
+// Comparison endpoint
+app.get('/comparison', (req, res) => {
+  const enhancedStatus = redisManager.getDetailedStatus();
+  const basicStatus = basicRedisManager.getDetailedStatus();
+  
+  res.json({
+    enhanced: {
+      service: 'Enhanced Redis (With Retry Strategy)',
+      status: enhancedStatus,
+      retryInfo: redisManager.getRetryInfo()
+    },
+    basic: {
+      service: 'Basic Redis (No Retry Strategy)',
+      status: basicStatus,
+      retryInfo: basicRedisManager.getRetryInfo()
+    },
+    comparison: {
+      enhancedFeatures: [
+        'Circuit breaker pattern',
+        'Exponential backoff with jitter',
+        'Auto-recovery mechanism',
+        'Stuck retry detection',
+        'Health checks',
+        'Graceful degradation',
+        'Comprehensive error handling',
+        'Real-time monitoring'
+      ],
+      basicProblems: [
+        'No retry strategy',
+        'No circuit breaker',
+        'No auto-recovery',
+        'No stuck retry detection',
+        'Limited error handling',
+        'No health checks',
+        'No graceful degradation',
+        'Poor user experience during outages'
+      ]
+    }
+  });
+});
+
+// Basic Redis crash simulation
+app.post('/basic-redis/simulate-crash', async (req, res) => {
+  try {
+    console.log('[💥] Basic Redis crash simulation requested...');
+    
+    // First, ensure basic Redis is connected
+    if (!basicRedisManager.isConnected()) {
+      basicRedisManager.connect();
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for connection
+    }
+    
+    // Set a test key to show it was working
+    await basicRedisManager.set('test-key', { message: 'This was working before crash' });
+    
+    // Simulate Redis crash
+    await recoveryManager.simulateCrash();
+    
+    // Try to perform operations with basic Redis (this will fail)
+    const testResults = [];
+    
+    try {
+      await basicRedisManager.set('post-crash-key', { message: 'This will fail' });
+      testResults.push({ operation: 'set', status: 'success', message: 'Unexpected success' });
+    } catch (error) {
+      testResults.push({ operation: 'set', status: 'failed', message: error.message });
+    }
+    
+    try {
+      await basicRedisManager.get('test-key');
+      testResults.push({ operation: 'get', status: 'success', message: 'Unexpected success' });
+    } catch (error) {
+      testResults.push({ operation: 'get', status: 'failed', message: error.message });
+    }
+    
+    try {
+      await basicRedisManager.ping();
+      testResults.push({ operation: 'ping', status: 'success', message: 'Unexpected success' });
+    } catch (error) {
+      testResults.push({ operation: 'ping', status: 'failed', message: error.message });
+    }
+    
+    res.json({
+      message: 'Basic Redis crash simulation completed',
+      redisStatus: basicRedisManager.getStatus(),
+      connectionAttempts: basicRedisManager.getConnectionAttempts(),
+      testResults: testResults,
+      problems: [
+        'No automatic reconnection attempts',
+        'No retry strategy to handle failures',
+        'No circuit breaker to prevent infinite retries',
+        'No fallback mechanism',
+        'Immediate failure on all operations',
+        'Poor user experience',
+        'No monitoring or alerting'
+      ],
+      impact: [
+        'Application crashes or returns errors immediately',
+        'No graceful degradation',
+        'Users see error messages instead of data',
+        'No automatic recovery when Redis comes back',
+        'Manual intervention required to restore service'
+      ]
+    });
+  } catch (error) {
+    console.error('[❌] Error in basic Redis crash simulation:', error);
+    res.status(500).json({
+      error: 'Failed to simulate basic Redis crash',
+      message: error.message
+    });
+  }
+});
+
+// Basic Redis recovery simulation
+app.post('/basic-redis/simulate-recovery', async (req, res) => {
+  try {
+    console.log('[🔄] Basic Redis recovery simulation requested...');
+    
+    // Restart Redis
+    await recoveryManager.simulateRestart();
+    
+    // Wait for Redis to come back up
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    
+    // Try to perform operations with basic Redis
+    const testResults = [];
+    
+    try {
+      await basicRedisManager.set('recovery-test-key', { message: 'Testing after recovery' });
+      testResults.push({ operation: 'set', status: 'success', message: 'Operation successful' });
+    } catch (error) {
+      testResults.push({ operation: 'set', status: 'failed', message: error.message });
+    }
+    
+    try {
+      const value = await basicRedisManager.get('recovery-test-key');
+      testResults.push({ operation: 'get', status: 'success', message: 'Operation successful', value: value });
+    } catch (error) {
+      testResults.push({ operation: 'get', status: 'failed', message: error.message });
+    }
+    
+    res.json({
+      message: 'Basic Redis recovery simulation completed',
+      redisStatus: basicRedisManager.getStatus(),
+      connectionAttempts: basicRedisManager.getConnectionAttempts(),
+      testResults: testResults,
+      problems: [
+        'No automatic detection of Redis availability',
+        'No automatic reconnection when Redis comes back',
+        'Manual intervention still required',
+        'No health checks to verify recovery',
+        'No monitoring of recovery status'
+      ],
+      impact: [
+        'Application remains broken until manual restart',
+        'No automatic recovery when Redis is available again',
+        'Poor user experience continues',
+        'Requires manual monitoring and intervention'
+      ]
+    });
+  } catch (error) {
+    console.error('[❌] Error in basic Redis recovery simulation:', error);
+    res.status(500).json({
+      error: 'Failed to simulate basic Redis recovery',
       message: error.message
     });
   }
