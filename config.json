@@ -1,0 +1,141 @@
+{
+  "redis": {
+    "connection": {
+      "host": "redis",
+      "port": 6379,
+      "maxRetries": 10,
+      "retryDelay": 1000,
+      "reconnectOnError": true,
+      "lazyConnect": true,
+      "keepAlive": 30000,
+      "family": 4,
+      "maxRetriesPerRequest": 3
+    },
+    "caching": {
+      "ttl": 360,
+      "maxIterations": 10000000000000000000,
+      "keyPrefix": "user:",
+      "defaultExpiry": 300
+    },
+    "resilience": {
+      "stuckRetryThreshold": 50,
+      "autoResetInterval": 30000,
+      "connectionTimeout": 5000,
+      "commandTimeout": 3000
+    }
+  },
+  "mysql": {
+    "connection": {
+      "host": "mysql",
+      "port": 3306,
+      "database": "redis_poc",
+      "user": "root",
+      "password": "password",
+      "connectionLimit": 10,
+      "acquireTimeout": 60000,
+      "timeout": 60000,
+      "reconnect": true
+    },
+    "queries": {
+      "searchUser": "SELECT * FROM users WHERE name LIKE ? OR phone_number LIKE ? LIMIT 1",
+      "getAllUsers": "SELECT * FROM users ORDER BY created_at DESC",
+      "createUser": "INSERT INTO users (name, phone_number, email) VALUES (?, ?, ?)"
+    }
+  },
+  "api": {
+    "server": {
+      "port": 8000,
+      "host": "0.0.0.0",
+      "cors": {
+        "origin": "*",
+        "methods": ["GET", "POST", "PUT", "DELETE"],
+        "allowedHeaders": ["Content-Type", "Authorization"]
+      }
+    },
+    "endpoints": {
+      "health": "/health",
+      "userSearch": "/user/search",
+      "testLoop": "/test-loop",
+      "redisKeys": "/redis/keys",
+      "containers": "/containers",
+      "logs": "/containers/logs",
+      "simulate": {
+        "crash": "/simulate/crash",
+        "restart": "/simulate/restart",
+        "restartEnhanced": "/simulate-restart-enhanced",
+        "authFailure": "/simulate-auth-failure"
+      }
+    },
+    "limits": {
+      "maxLoopIterations": 10000000000000000000,
+      "maxSearchResults": 1000,
+      "maxLogLines": 1000
+    }
+  },
+  "docker": {
+    "containers": {
+      "redis": "redis-resilience-poc-redis-1",
+      "mysql": "redis-resilience-poc-mysql-1",
+      "app": "redis-resilience-poc-app-1"
+    },
+    "healthChecks": {
+      "interval": 30000,
+      "timeout": 10000,
+      "retries": 3,
+      "startPeriod": 40000
+    }
+  },
+  "frontend": {
+    "ui": {
+      "autoRefreshIntervals": [2000, 3000, 5000],
+      "defaultRefreshInterval": 5000,
+      "containerRefreshInterval": 10000,
+      "logsRefreshInterval": 5000
+    },
+    "responsive": {
+      "breakpoints": {
+        "sm": 640,
+        "md": 768,
+        "lg": 1024,
+        "xl": 1280,
+        "2xl": 1536
+      },
+      "containerWidths": {
+        "mobile": "max-w-4xl",
+        "tablet": "lg:max-w-5xl",
+        "desktop": "xl:max-w-6xl",
+        "large": "2xl:max-w-7xl"
+      }
+    }
+  },
+  "simulation": {
+    "restart": {
+      "downtime": 45000,
+      "retryInterval": 1000,
+      "maxRetries": 50,
+      "recoveryTimeout": 30000
+    },
+    "loopTest": {
+      "defaultIterations": 100,
+      "maxIterations": 10000000000000000000,
+      "realTimeThreshold": 1000,
+      "progressUpdateInterval": 100
+    }
+  },
+  "logging": {
+    "levels": {
+      "error": 0,
+      "warn": 1,
+      "info": 2,
+      "debug": 3
+    },
+    "formats": {
+      "timestamp": "YYYY-MM-DD HH:mm:ss",
+      "logFormat": "[{timestamp}] {level}: {message}"
+    },
+    "retention": {
+      "maxLogLines": 1000,
+      "maxHistoryEntries": 100
+    }
+  }
+} 

@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Redis Connection PoC</title>
+  <script defer src="script.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    body {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+    }
+    
+    /* Glassmorphism background elements */
+    body::before {
+      content: '';
+      position: fixed;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at 20% 80%, rgba(100, 149, 237, 0.15) 0%, transparent 50%),
+                  radial-gradient(circle at 80% 20%, rgba(138, 43, 226, 0.15) 0%, transparent 50%),
+                  radial-gradient(circle at 40% 40%, rgba(64, 224, 208, 0.15) 0%, transparent 50%);
+      animation: float 20s ease-in-out infinite;
+      z-index: -1;
+    }
+    
+    @keyframes float {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      33% { transform: translateY(-20px) rotate(1deg); }
+      66% { transform: translateY(10px) rotate(-1deg); }
+    }
+    
+    /* Glassmorphism card styles */
+    .glass {
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+    }
+    
+    .glass-dark {
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6);
+    }
+    
+    .glass-hover {
+      transition: all 0.3s ease;
+    }
+    
+    .glass-hover:hover {
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.7);
+    }
+    
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.5);
+    }
+    
+    /* Glow effects */
+    .glow {
+      box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+    }
+    
+    .glow-blue {
+      box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+    }
+    
+    .glow-green {
+      box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+    }
+    
+    .glow-red {
+      box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+    }
+    
+    .glow-purple {
+      box-shadow: 0 0 20px rgba(147, 51, 234, 0.3);
+    }
+    
+    /* Gradient button styles */
+    .btn-gradient-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      transition: all 0.3s ease;
+    }
+    
+    .btn-gradient-primary:hover {
+      background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+    }
+    
+    .btn-gradient-success {
+      background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+      color: white;
+      border: none;
+      transition: all 0.3s ease;
+    }
+    
+    .btn-gradient-success:hover {
+      background: linear-gradient(135deg, #38ef7d 0%, #11998e 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(17, 153, 142, 0.4);
+    }
+    
+    .btn-gradient-warning {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      color: white;
+      border: none;
+      transition: all 0.3s ease;
+    }
+    
+    .btn-gradient-warning:hover {
+      background: linear-gradient(135deg, #f5576c 0%, #f093fb 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(240, 147, 251, 0.4);
+    }
+    
+    .btn-gradient-danger {
+      background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+      color: white;
+      border: none;
+      transition: all 0.3s ease;
+    }
+    
+    .btn-gradient-danger:hover {
+      background: linear-gradient(135deg, #ee5a24 0%, #ff6b6b 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(255, 107, 107, 0.4);
+    }
+    
+    .btn-gradient-info {
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+      color: white;
+      border: none;
+      transition: all 0.3s ease;
+    }
+    
+    .btn-gradient-info:hover {
+      background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(79, 172, 254, 0.4);
+    }
+    
+    .btn-gradient-purple {
+      background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+      color: #333;
+      border: none;
+      transition: all 0.3s ease;
+    }
+    
+    .btn-gradient-purple:hover {
+      background: linear-gradient(135deg, #fed6e3 0%, #a8edea 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(168, 237, 234, 0.4);
+    }
+  </style>
+</head>
+<body class="text-white p-2 sm:p-4">
+  <!-- Header -->
+  <div class="glass glass-hover p-4 mb-6 rounded-2xl shadow-lg">
+    <div class="w-full max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between">
+        <h1 class="text-2xl sm:text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">🔌 Redis Connection PoC</h1>
+        <button onclick="showPOCDocument()" class="btn-gradient-primary px-4 py-2 rounded-lg font-medium transition-all duration-200 transform hover:scale-105 text-sm">
+          📋 POC Document
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <div class="w-full max-w-4xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    
+    <!-- Connection Status -->
+    <div class="glass glass-hover p-4 sm:p-6 lg:p-8 rounded-2xl mb-6">
+      <div class="flex items-center justify-between mb-6 cursor-pointer" onclick="toggleSection('connectionStatus')">
+        <h2 class="text-xl sm:text-2xl font-semibold text-gray-100">Connection Status</h2>
+        <div class="flex items-center gap-2">
+          <div id="status-indicator" class="w-4 h-4 rounded-full bg-gray-600"></div>
+          <span id="connectionStatusToggle" class="text-gray-400 text-xl">▼</span>
+        </div>
+      </div>
+      
+      <div id="connectionStatusContent">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div class="glass-dark glass-hover p-4 rounded-lg">
+            <p class="text-sm text-gray-300 mb-1">API Status</p>
+            <p id="status" class="text-xl font-semibold text-white">Checking...</p>
+          </div>
+          <div class="glass-dark glass-hover p-4 rounded-lg">
+            <p class="text-sm text-gray-300 mb-1">Redis Status</p>
+            <p id="redis" class="text-xl font-semibold text-white">--</p>
+          </div>
+        </div>
+        
+        <div class="flex flex-wrap gap-3">
+          <button onclick="checkStatus()" class="btn-gradient-primary px-6 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105">
+            🔁 Check Now
+          </button>
+          <button onclick="toggleAutoRefresh()" oncontextmenu="stopAutoRefresh(); return false;" id="auto-refresh-btn" class="btn-gradient-success px-6 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105" title="Click to toggle auto-refresh. When active, click to change interval (2s/3s/5s). Right-click to stop.">
+            🔄 Auto Refresh: OFF
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- User Search -->
+    <div class="glass glass-hover p-4 sm:p-6 lg:p-8 rounded-2xl mb-6">
+      <div class="flex items-center justify-between mb-6 cursor-pointer" onclick="toggleSection('userSearch')">
+        <h2 class="text-xl sm:text-2xl font-semibold text-gray-100">User Search</h2>
+        <span id="userSearchToggle" class="text-gray-400 text-xl">▼</span>
+      </div>
+      
+      <div id="userSearchContent">
+        <div class="flex gap-4 mb-4">
+          <input type="text" id="searchQuery" placeholder="Enter name or phone number (e.g., John or +1234567890)" 
+                 class="flex-1 px-4 py-3 glass-dark border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-gray-300">
+          <button onclick="searchUser()" class="btn-gradient-primary px-6 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105">
+            🔍 Search
+          </button>
+          <button onclick="loadAllUsers()" class="btn-gradient-primary px-6 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105">
+            📋 All Users
+          </button>
+        </div>
+        <div id="userResult" class="hidden">
+          <div class="glass-dark glass-hover p-4 rounded-lg">
+            <h3 class="font-semibold text-white mb-2">User Details</h3>
+            <div id="userDetails" class="text-sm text-gray-200"></div>
+          </div>
+        </div>
+        <div id="allUsersResult" class="hidden">
+          <div class="glass-dark glass-hover p-4 rounded-lg">
+            <h3 class="font-semibold text-gray-100 mb-4">All Available Contacts</h3>
+            
+            <!-- View Toggle Buttons -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <button onclick="showMySQLView()" id="mysqlViewBtn" class="btn-gradient-primary px-6 py-4 rounded-lg font-medium transition-all duration-200 transform hover:scale-105 text-lg">
+                🗄️ MySQL View
+              </button>
+              <button onclick="showRedisView()" id="redisViewBtn" class="btn-gradient-primary px-6 py-4 rounded-lg font-medium transition-all duration-200 transform hover:scale-105 text-lg">
+                📦 Redis View
+              </button>
+              <button onclick="showSideBySideView()" id="sideBySideViewBtn" class="btn-gradient-primary px-6 py-4 rounded-lg font-medium transition-all duration-200 transform hover:scale-105 text-lg">
+                🔄 Side by Side
+              </button>
+            </div>
+            
+            <!-- MySQL View -->
+            <div id="mysqlView" class="hidden">
+              <h4 class="font-medium text-gray-200 mb-3">🗄️ MySQL Database Users</h4>
+              <div id="mysqlUsersDetails" class="text-sm text-gray-300"></div>
+            </div>
+            
+            <!-- Redis View -->
+            <div id="redisView" class="hidden">
+              <h4 class="font-medium text-gray-200 mb-3">📦 Redis Cache Keys</h4>
+              <div id="redisKeysDetails" class="text-sm text-gray-300"></div>
+            </div>
+            
+            <!-- Side by Side View -->
+            <div id="sideBySideView" class="hidden">
+              <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                <!-- MySQL Column -->
+                <div>
+                  <h4 class="font-medium text-gray-200 mb-3 text-lg">🗄️ MySQL Database</h4>
+                  <div id="sideBySideMySQL" class="text-sm text-gray-300"></div>
+                </div>
+                
+                <!-- Redis Column -->
+                <div>
+                  <h4 class="font-medium text-gray-200 mb-3 text-lg">📦 Redis Cache</h4>
+                  <div id="sideBySideRedis" class="text-sm text-gray-300"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loop Testing -->
+    <div class="glass glass-hover p-4 sm:p-6 lg:p-8 rounded-2xl mb-6">
+      <div class="flex items-center justify-between mb-6 cursor-pointer" onclick="toggleSection('loopTesting')">
+        <h2 class="text-xl sm:text-2xl font-semibold text-gray-100">Loop Testing</h2>
+        <span id="loopTestingToggle" class="text-gray-400 text-xl">▼</span>
+      </div>
+      
+      <div id="loopTestingContent">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <input type="text" id="loopQuery" placeholder="Enter name or phone number to test" 
+                 class="md:col-span-2 px-4 py-3 glass-dark border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-gray-300">
+          <input type="number" id="loopCount" placeholder="100" value="100" min="1" max="1000"
+                 class="px-4 py-3 glass-dark border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-white placeholder-gray-300">
+          <button onclick="runLoopTest()" class="btn-gradient-primary px-6 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105">
+            🔄 Run Loop Test
+          </button>
+        </div>
+        
+        <!-- Loop Test Configuration -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div class="glass-dark glass-hover p-4 rounded-lg">
+            <h3 class="font-semibold text-white mb-3">⚙️ Test Settings</h3>
+            <div class="space-y-2 text-sm text-gray-200">
+              <div class="flex items-center justify-between">
+                <span>Redis Fallback:</span>
+                <span class="text-green-400 font-semibold">Enabled</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span>Auto Retry:</span>
+                <span class="text-green-400 font-semibold">Enabled</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span>Status Codes:</span>
+                <span class="text-blue-400 font-semibold">Shown</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="glass-dark glass-hover p-4 rounded-lg">
+            <h3 class="font-semibold text-white mb-3">📊 Expected Behavior</h3>
+            <div class="space-y-2 text-sm text-gray-200">
+              <div>• Try Redis first</div>
+              <div>• Fallback to MySQL if Redis fails</div>
+              <div>• Show HTTP status codes</div>
+              <div>• Continue testing during Redis crashes</div>
+            </div>
+          </div>
+          
+          <div class="glass-dark glass-hover p-4 rounded-lg">
+            <h3 class="font-semibold text-white mb-3">🚨 Crash Handling</h3>
+            <div class="space-y-2 text-sm text-gray-200">
+              <div>• Redis crash: Continue with MySQL</div>
+              <div>• Redis restart: Resume Redis usage</div>
+              <div>• Network issues: Retry with backoff</div>
+              <div>• All failures: Log with status codes</div>
+            </div>
+          </div>
+        </div>
+        
+        <div id="loopTestResult" class="hidden">
+          <div class="glass-dark glass-hover p-4 rounded-lg">
+            <h3 class="font-semibold text-white mb-4">📊 Loop Test Results</h3>
+            <div id="loopTestDetails" class="text-sm text-gray-200"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Simulation Controls -->
+    <div class="glass glass-hover p-4 sm:p-6 lg:p-8 rounded-2xl mb-6">
+      <div class="flex items-center justify-between mb-6 cursor-pointer" onclick="toggleSection('simulationControls')">
+        <h2 class="text-xl sm:text-2xl font-semibold text-gray-100">Simulation Controls</h2>
+        <span id="simulationControlsToggle" class="text-gray-400 text-xl">▼</span>
+      </div>
+      
+      <div id="simulationControlsContent">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <button onclick="simulateCrash()" class="btn-gradient-primary px-4 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105">
+            💥 Crash Redis
+          </button>
+          <button onclick="simulateRestart()" class="btn-gradient-primary px-4 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105">
+            🔄 Restart Redis
+          </button>
+          <button onclick="simulateRestartEnhanced()" class="btn-gradient-primary px-4 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105">
+                          ⏱️ Enhanced Restart (20s)
+          </button>
+          <button onclick="simulateAuthFailure()" class="btn-gradient-primary px-4 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105">
+            🔐 Auth Failure
+          </button>
+          <button onclick="clearRedisCache()" class="btn-gradient-primary px-4 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105">
+            🗑️ Clear Cache
+          </button>
+        </div>
+        <p class="text-sm text-gray-400 mt-4 text-center">
+          Use these buttons to simulate different Redis failure scenarios and test cache behavior
+        </p>
+        
+        <!-- Simulation Status -->
+        <div id="enhancedRestartStatus" class="hidden mt-6">
+          <div class="glass-dark glass-hover p-6 rounded-lg">
+            <h3 class="font-semibold text-gray-100 mb-4">⏱️ Simulation Status</h3>
+            
+            <!-- Progress Bar -->
+            <div class="mb-4">
+              <div class="flex justify-between text-sm text-gray-300 mb-2">
+                <span id="restartProgressText">Initializing...</span>
+                <span id="restartProgressPercent">0%</span>
+              </div>
+              <div class="w-full bg-gray-600 rounded-full h-3">
+                <div id="restartProgressBar" class="bg-indigo-600 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+              </div>
+            </div>
+            
+            <!-- Status Details -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div class="glass glass-hover p-3 rounded">
+                <div class="font-medium text-white mb-2">🔄 Retry Strategy</div>
+                <div id="retryStrategyStatus" class="text-gray-200">Waiting...</div>
+              </div>
+              <div class="glass glass-hover p-3 rounded">
+                <div class="font-medium text-white mb-2">📊 Connection Status</div>
+                <div id="connectionStatusDetails" class="text-gray-200">Checking...</div>
+              </div>
+              <div class="glass glass-hover p-3 rounded">
+                <div class="font-medium text-white mb-2">⏰ Time Status</div>
+                <div id="timeStatusDetails" class="text-gray-200">--</div>
+              </div>
+              <div class="glass glass-hover p-3 rounded">
+                <div class="font-medium text-white mb-2">🎯 Data Source</div>
+                <div id="dataSourceStatus" class="text-gray-200">--</div>
+              </div>
+            </div>
+            
+            <!-- Real-time Log -->
+            <div class="mt-4">
+              <div class="font-medium text-white mb-2">📋 Real-time Log</div>
+              <div id="restartLog" class="glass-dark text-green-400 p-3 rounded font-mono text-xs max-h-32 overflow-y-auto border border-gray-400">
+                <div class="text-gray-400">Waiting for simulation to start...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Container Logs -->
+    <div class="glass glass-hover p-4 sm:p-6 lg:p-8 rounded-2xl mb-6">
+      <div class="flex items-center justify-between mb-6 cursor-pointer" onclick="toggleSection('containerLogs')">
+        <h2 class="text-xl sm:text-2xl font-semibold text-gray-100">Container Logs</h2>
+        <span id="containerLogsToggle" class="text-gray-400 text-xl">▼</span>
+      </div>
+      
+      <div id="containerLogsContent" class="block">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <button onclick="loadContainerLogs()" class="btn-gradient-primary px-6 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105">
+            📋 Load Container Logs
+          </button>
+          <button onclick="toggleLogsAutoRefresh()" id="logs-auto-refresh-btn" class="btn-gradient-primary px-6 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105">
+            📋 Real-time Logs: OFF
+          </button>
+        </div>
+        
+        <div id="containerLogsResult" class="block">
+          <div class="bg-gray-700 border border-gray-600 p-4 rounded-lg">
+            <h3 class="font-semibold text-gray-100 mb-4">📋 Container Logs</h3>
+            
+            <!-- Container Logs Navigation -->
+            <div class="flex flex-wrap gap-2 mb-4">
+              <button onclick="showContainerLogs('redis')" id="redisLogsBtn" class="btn-gradient-primary px-4 py-2 rounded-lg font-medium transition-all duration-200 transform hover:scale-105">
+                🔴 Redis Logs
+              </button>
+              <button onclick="showContainerLogs('mysql')" id="mysqlLogsBtn" class="btn-gradient-primary px-4 py-2 rounded-lg font-medium transition-all duration-200 transform hover:scale-105">
+                🔵 MySQL Logs
+              </button>
+              <button onclick="showContainerLogs('app')" id="appLogsBtn" class="btn-gradient-primary px-4 py-2 rounded-lg font-medium transition-all duration-200 transform hover:scale-105">
+                🟢 App Logs
+              </button>
+              <button onclick="showContainerLogs('all')" id="allLogsBtn" class="btn-gradient-primary px-4 py-2 rounded-lg font-medium transition-all duration-200 transform hover:scale-105">
+                🌈 All Logs
+              </button>
+            </div>
+            
+            <!-- Redis Logs -->
+            <div id="redisLogsSection" class="hidden">
+              <h4 class="font-medium text-gray-200 mb-3">🔴 Redis Container Logs</h4>
+              <div id="redisLogsDetails" class="text-sm text-gray-300 max-h-60 overflow-y-auto bg-black text-green-400 p-3 rounded font-mono border border-gray-600"></div>
+            </div>
+            
+            <!-- MySQL Logs -->
+            <div id="mysqlLogsSection" class="hidden">
+              <h4 class="font-medium text-gray-200 mb-3">🔵 MySQL Container Logs</h4>
+              <div id="mysqlLogsDetails" class="text-sm text-gray-300 max-h-60 overflow-y-auto bg-black text-blue-400 p-3 rounded font-mono border border-gray-600"></div>
+            </div>
+            
+            <!-- App Logs -->
+            <div id="appLogsSection" class="hidden">
+              <h4 class="font-medium text-gray-200 mb-3">🟢 App Container Logs</h4>
+              <div id="appLogsDetails" class="text-sm text-gray-300 max-h-60 overflow-y-auto bg-black text-green-400 p-3 rounded font-mono border border-gray-600"></div>
+            </div>
+            
+            <!-- All Logs Combined -->
+            <div id="allLogsSection" class="block">
+              <h4 class="font-medium text-gray-200 mb-3">🌈 All Container Logs</h4>
+              <div id="allLogsDetails" class="text-sm text-gray-300 max-h-60 overflow-y-auto bg-black text-white p-3 rounded font-mono border border-gray-600"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Container Status -->
+    <div class="glass glass-hover p-4 sm:p-6 lg:p-8 rounded-2xl mb-6">
+      <div class="flex items-center justify-between mb-6 cursor-pointer" onclick="toggleSection('containerStatus')">
+        <h2 class="text-xl sm:text-2xl font-semibold text-gray-100">Container Status</h2>
+        <span id="containerStatusToggle" class="text-gray-400 text-xl">▼</span>
+      </div>
+      
+      <div id="containerStatusContent">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <button onclick="loadAllContainers()" class="btn-gradient-primary px-6 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105">
+            🔄 Refresh Containers
+          </button>
+          <button onclick="toggleContainerAutoRefresh()" id="container-auto-refresh-btn" class="btn-gradient-primary px-6 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105">
+            🔄 Auto Refresh: OFF
+          </button>
+        </div>
+        
+        <!-- Container Status Overview -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <div class="bg-gray-700 border border-gray-600 p-4 rounded-lg">
+            <h3 class="font-semibold text-gray-100 mb-3">📊 Container Overview</h3>
+            <div id="containerOverview" class="text-sm text-gray-300">
+              <div class="flex items-center justify-between mb-2">
+                <span>Total Containers:</span>
+                <span id="totalContainers" class="font-semibold">--</span>
+              </div>
+              <div class="flex items-center justify-between mb-2">
+                <span>Running:</span>
+                <span id="runningContainers" class="text-green-400 font-semibold">--</span>
+              </div>
+              <div class="flex items-center justify-between mb-2">
+                <span>Stopped:</span>
+                <span id="stoppedContainers" class="text-red-400 font-semibold">--</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span>Other:</span>
+                <span id="otherContainers" class="text-yellow-400 font-semibold">--</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="bg-gray-700 border border-gray-600 p-4 rounded-lg">
+            <h3 class="font-semibold text-gray-100 mb-3">🔌 Network Status</h3>
+            <div id="networkStatus" class="text-sm text-gray-300">
+              <div class="flex items-center justify-between mb-2">
+                <span>Redis:</span>
+                <span id="redisNetworkStatus" class="font-semibold">--</span>
+              </div>
+              <div class="flex items-center justify-between mb-2">
+                <span>MySQL:</span>
+                <span id="mysqlNetworkStatus" class="font-semibold">--</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span>App:</span>
+                <span id="appNetworkStatus" class="font-semibold">--</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="bg-gray-700 border border-gray-600 p-4 rounded-lg">
+            <h3 class="font-semibold text-gray-100 mb-3">⚡ Quick Actions</h3>
+            <div class="space-y-2">
+              <button onclick="loadAllContainers()" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm font-medium transition-colors">
+                🔄 Refresh Now
+              </button>
+              <button onclick="toggleContainerAutoRefresh()" id="quickAutoRefreshBtn" class="w-full bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded text-sm font-medium transition-colors">
+                🔄 Auto Refresh
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <div id="containersResult">
+          <div class="bg-gray-700 border border-gray-600 p-4 rounded-lg">
+            <h3 class="font-semibold text-gray-100 mb-4">📋 All Containers Status</h3>
+            <div id="containersDetails" class="text-sm text-gray-300"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Connection History -->
+    <div class="glass glass-hover p-4 sm:p-6 lg:p-8 rounded-2xl mb-6">
+      <div class="flex items-center justify-between mb-6 cursor-pointer" onclick="toggleSection('connectionHistory')">
+        <h2 class="text-xl sm:text-2xl font-semibold text-gray-100">Connection History</h2>
+        <span id="connectionHistoryToggle" class="text-gray-400 text-xl">▼</span>
+      </div>
+      
+      <div id="connectionHistoryContent">
+        <div id="history" class="space-y-2 max-h-40 overflow-y-auto">
+          <p class="text-gray-400 text-center">No history yet...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Retry Strategy & Recovery -->
+    <div class="glass glass-hover p-4 sm:p-6 lg:p-8 rounded-2xl mb-6">
+      <div class="flex items-center justify-between mb-6 cursor-pointer" onclick="toggleSection('retryStrategy')">
+        <h2 class="text-xl sm:text-2xl font-semibold text-gray-100">🔄 Retry Strategy & Recovery</h2>
+        <span id="retryStrategyToggle" class="text-gray-400 text-xl">▼</span>
+      </div>
+      
+      <div id="retryStrategyContent">
+        <div id="retry-info">
+          <p class="text-gray-400 text-center">Loading retry information...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- POC Document Modal -->
+  <div id="pocModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+    <div class="glass glass-hover max-w-4xl w-full rounded-2xl" style="max-height: 90vh; overflow: hidden;">
+      <!-- Header -->
+      <div class="p-6 border-b border-gray-600" style="flex-shrink: 0;">
+        <div class="flex items-center justify-between">
+          <h2 class="text-2xl font-bold text-gray-100">📋 Redis Resilience Implementation Documentation</h2>
+          <button onclick="hidePOCDocument()" class="btn-gradient-primary px-4 py-2 rounded-lg font-medium transition-all duration-200 transform hover:scale-105">
+            ✕ Close
+          </button>
+        </div>
+      </div>
+      
+      <!-- Scrollable Content -->
+      <div class="p-6" style="overflow-y: auto; max-height: calc(90vh - 120px);">
+        <div class="glass-dark glass-hover p-6 rounded-lg mb-6">
+          <h3 class="text-xl font-semibold text-gray-100 mb-4">📋 Executive Summary</h3>
+          <p class="text-gray-300 leading-relaxed">
+            This document details the comprehensive Redis resilience implementation in our Node.js application, showcasing production-ready patterns for handling Redis outages, connection failures, and ensuring high availability through intelligent fallback mechanisms. Our implementation directly addresses common Redis cache manager shortcomings and provides robust solutions for production environments.
+          </p>
+        </div>
+        
+        <div class="glass-dark glass-hover p-6 rounded-lg mb-6">
+          <h3 class="text-xl font-semibold text-gray-100 mb-4">🔧 Addressing Redis Implementation Shortcomings</h3>
+          <div class="space-y-4">
+            <div>
+              <h4 class="font-semibold text-gray-200 mb-2">❌ Common Shortcomings in Redis Cache Managers</h4>
+              <ul class="text-gray-300 text-sm space-y-2">
+                <li><strong>• Redis Connection Error Handling:</strong> Lack of explicit handling during initialization</li>
+                <li><strong>• Missing ioredis Resilience Options:</strong> No retryStrategy, autoResendUnfulfilledCommands</li>
+                <li><strong>• No Fallback Mechanism:</strong> Complete failure during Redis outages</li>
+                <li><strong>• Limited Error Visibility:</strong> Poor logging and error handling</li>
+                <li><strong>• No Circuit Breaker Pattern:</strong> Continuous retries during outages</li>
+                <li><strong>• Missing Health Checks:</strong> No proactive monitoring</li>
+              </ul>
+            </div>
+            <div>
+              <h4 class="font-semibold text-gray-200 mb-2">✅ Our POC Solutions</h4>
+              <ul class="text-gray-300 text-sm space-y-2">
+                <li><strong>• Robust Connection Management:</strong> Explicit error handling with exponential backoff</li>
+                <li><strong>• Advanced ioredis Configuration:</strong> retryStrategy, reconnectOnError, maxRetriesPerRequest</li>
+                <li><strong>• MySQL Fallback Mechanism:</strong> Automatic fallback to database during Redis outages</li>
+                <li><strong>• Comprehensive Error Handling:</strong> Detailed logging and error tracking</li>
+                <li><strong>• Circuit Breaker Implementation:</strong> Smart retry limits and auto-reset</li>
+                <li><strong>• Real-time Health Monitoring:</strong> Continuous connection status tracking</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        
+        <div class="glass-dark glass-hover p-6 rounded-lg mb-6">
+          <h3 class="text-xl font-semibold text-gray-100 mb-4">🎯 Redis Resilience Objectives</h3>
+          <ul class="text-gray-300 space-y-2">
+            <li><strong>Zero Downtime:</strong> Application continues operating during Redis outages</li>
+            <li><strong>Automatic Recovery:</strong> Self-healing Redis connections with intelligent retry strategies</li>
+            <li><strong>Data Consistency:</strong> Accurate data retrieval from both Redis and MySQL sources</li>
+            <li><strong>Performance Optimization:</strong> Minimal latency impact during failover scenarios</li>
+            <li><strong>Real-time Monitoring:</strong> Comprehensive visibility into Redis connection health</li>
+          </ul>
+        </div>
+        
+        <div class="glass-dark glass-hover p-6 rounded-lg mb-6">
+          <h3 class="text-xl font-semibold text-gray-100 mb-4">🏗️ Core Components</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <h4 class="font-semibold text-gray-200 mb-2">Redis Manager</h4>
+              <ul class="text-gray-300 text-sm space-y-1">
+                <li>• Connection lifecycle management</li>
+                <li>• Exponential backoff retry strategy</li>
+                <li>• Stuck retry loop detection</li>
+                <li>• Real-time connection status tracking</li>
+              </ul>
+            </div>
+            <div>
+              <h4 class="font-semibold text-gray-200 mb-2">Caching Strategy</h4>
+              <ul class="text-gray-300 text-sm space-y-1">
+                <li>• Redis-first approach with MySQL fallback</li>
+                <li>• Configurable TTL (6 minutes default)</li>
+                <li>• Automatic cache warming</li>
+                <li>• Graceful degradation during outages</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        
+        <div class="glass-dark glass-hover p-6 rounded-lg mb-6">
+          <h3 class="text-xl font-semibold text-gray-100 mb-4">🔄 Resilience Patterns & Technical Solutions</h3>
+          <div class="space-y-4">
+            <div>
+              <h4 class="font-semibold text-gray-200 mb-2">1. Circuit Breaker Pattern</h4>
+              <p class="text-gray-300 text-sm mb-2">Automatic fallback to MySQL during Redis failures with seamless recovery when Redis becomes available again.</p>
+              <div class="bg-gray-800 p-3 rounded text-xs text-gray-300">
+                <code>// Redis-first with MySQL fallback<br>
+                if (redisManager.isConnected()) {<br>
+                &nbsp;&nbsp;const cached = await redisManager.get(key);<br>
+                &nbsp;&nbsp;if (cached) return cached;<br>
+                }<br>
+                // Fallback to MySQL<br>
+                const data = await mysqlQuery(query);<br>
+                if (redisManager.isConnected()) {<br>
+                &nbsp;&nbsp;await redisManager.set(key, data, ttl);<br>
+                }</code>
+              </div>
+            </div>
+            <div>
+              <h4 class="font-semibold text-gray-200 mb-2">2. Advanced ioredis Configuration</h4>
+              <p class="text-gray-300 text-sm mb-2">Comprehensive ioredis options for production resilience.</p>
+              <div class="bg-gray-800 p-3 rounded text-xs text-gray-300">
+                <code>const redis = new Redis({<br>
+                &nbsp;&nbsp;host: 'redis', port: 6379,<br>
+                &nbsp;&nbsp;retryDelayOnFailover: 1000,<br>
+                &nbsp;&nbsp;maxRetriesPerRequest: 3,<br>
+                &nbsp;&nbsp;reconnectOnError: true,<br>
+                &nbsp;&nbsp;lazyConnect: true,<br>
+                &nbsp;&nbsp;keepAlive: 30000,<br>
+                &nbsp;&nbsp;family: 4<br>
+                });</code>
+              </div>
+            </div>
+            <div>
+              <h4 class="font-semibold text-gray-200 mb-2">3. Stuck Retry Detection & Auto-Reset</h4>
+              <p class="text-gray-300 text-sm mb-2">Automatic detection and resolution of infinite retry loops with forced connection resets.</p>
+              <div class="bg-gray-800 p-3 rounded text-xs text-gray-300">
+                <code>isStuckInRetry() {<br>
+                &nbsp;&nbsp;return this.connectionAttempts > this.stuckRetryThreshold;<br>
+                }<br><br>
+                async forceResetIfStuck() {<br>
+                &nbsp;&nbsp;if (this.isStuckInRetry()) {<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;await this.disconnect();<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;this.connectionAttempts = 0;<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;await this.connect();<br>
+                &nbsp;&nbsp;}<br>
+                }</code>
+              </div>
+            </div>
+            <div>
+              <h4 class="font-semibold text-gray-200 mb-2">4. Real-time Health Monitoring</h4>
+              <p class="text-gray-300 text-sm mb-2">Continuous monitoring with automatic health checks and status tracking.</p>
+              <div class="bg-gray-800 p-3 rounded text-xs text-gray-300">
+                <code>// Auto-reset stuck connections every 30 seconds<br>
+                setInterval(() => {<br>
+                &nbsp;&nbsp;if (redisManager.isStuckInRetry()) {<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;redisManager.forceResetIfStuck();<br>
+                &nbsp;&nbsp;}<br>
+                }, 30000);<br><br>
+                // Continuous health monitoring<br>
+                setInterval(async () => {<br>
+                &nbsp;&nbsp;await redisManager.redis.ping();<br>
+                &nbsp;&nbsp;updateStatusIndicator('connected');<br>
+                }, 5000);</code>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+
+        
+        <div class="glass-dark glass-hover p-6 rounded-lg mb-6">
+          <h3 class="text-xl font-semibold text-gray-100 mb-4">📊 Comprehensive Shortcomings Analysis</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-gray-600">
+                  <th class="text-left p-2 text-gray-200">Shortcoming</th>
+                  <th class="text-left p-2 text-gray-200">Traditional Approach</th>
+                  <th class="text-left p-2 text-gray-200">Our POC Solution</th>
+                  <th class="text-left p-2 text-gray-200">Impact</th>
+                </tr>
+              </thead>
+              <tbody class="text-gray-300">
+                <tr class="border-b border-gray-700">
+                  <td class="p-2 font-medium">Redis Connection Errors</td>
+                  <td class="p-2">Basic error handling, app crashes</td>
+                  <td class="p-2">Exponential backoff + stuck retry detection</td>
+                  <td class="p-2 text-green-400">Zero downtime</td>
+                </tr>
+                <tr class="border-b border-gray-700">
+                  <td class="p-2 font-medium">Missing ioredis Options</td>
+                  <td class="p-2">Default settings, poor resilience</td>
+                  <td class="p-2">retryStrategy, reconnectOnError, maxRetriesPerRequest</td>
+                  <td class="p-2 text-green-400">Production stability</td>
+                </tr>
+                <tr class="border-b border-gray-700">
+                  <td class="p-2 font-medium">No Fallback Mechanism</td>
+                  <td class="p-2">Complete failure during outages</td>
+                  <td class="p-2">MySQL fallback with circuit breaker pattern</td>
+                  <td class="p-2 text-green-400">Continuous operation</td>
+                </tr>
+                <tr class="border-b border-gray-700">
+                  <td class="p-2 font-medium">Limited Error Visibility</td>
+                  <td class="p-2">Poor logging, hard to debug</td>
+                  <td class="p-2">Real-time monitoring + detailed error tracking</td>
+                  <td class="p-2 text-green-400">Easy troubleshooting</td>
+                </tr>
+                <tr class="border-b border-gray-700">
+                  <td class="p-2 font-medium">No Circuit Breaker</td>
+                  <td class="p-2">Continuous retries, resource waste</td>
+                  <td class="p-2">Smart retry limits + auto-reset</td>
+                  <td class="p-2 text-green-400">Resource optimization</td>
+                </tr>
+                <tr class="border-b border-gray-700">
+                  <td class="p-2 font-medium">Missing Health Checks</td>
+                  <td class="p-2">Reactive problem detection</td>
+                  <td class="p-2">Proactive monitoring + auto-recovery</td>
+                  <td class="p-2 text-green-400">Preventive maintenance</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        <div class="glass-dark glass-hover p-6 rounded-lg mb-6">
+          <h3 class="text-xl font-semibold text-gray-100 mb-4">🧪 Testing & Validation</h3>
+          <div class="space-y-3">
+            <div class="flex items-start space-x-3">
+              <span class="text-green-400 text-lg">✅</span>
+              <div>
+                <h4 class="font-semibold text-gray-200">Redis Container Crash</h4>
+                <p class="text-gray-300 text-sm">Verify automatic fallback to MySQL and seamless recovery</p>
+              </div>
+            </div>
+            <div class="flex items-start space-x-3">
+              <span class="text-green-400 text-lg">✅</span>
+              <div>
+                <h4 class="font-semibold text-gray-200">Network Partition</h4>
+                <p class="text-gray-300 text-sm">Test connection timeout and retry logic under network stress</p>
+              </div>
+            </div>
+            <div class="flex items-start space-x-3">
+              <span class="text-green-400 text-lg">✅</span>
+              <div>
+                <h4 class="font-semibold text-gray-200">High Load Testing</h4>
+                <p class="text-gray-300 text-sm">Ensure performance under stress with millions of iterations</p>
+              </div>
+            </div>
+            <div class="flex items-start space-x-3">
+              <span class="text-green-400 text-lg">✅</span>
+              <div>
+                <h4 class="font-semibold text-gray-200">Extended Downtime</h4>
+                <p class="text-gray-300 text-sm">Test 20-second Redis outage scenarios with real-time monitoring</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="glass-dark glass-hover p-6 rounded-lg mb-6">
+          <h3 class="text-xl font-semibold text-gray-100 mb-4">🎮 Detailed Simulation Guide</h3>
+          <div class="space-y-6">
+            <div>
+              <h4 class="font-semibold text-gray-200 mb-3">1. Enhanced Redis Restart Simulation (20s)</h4>
+              <div class="bg-gray-800 p-4 rounded-lg">
+                <p class="text-gray-300 text-sm mb-3"><strong>Purpose:</strong> Test complete Redis outage and recovery with real-time monitoring</p>
+                <div class="space-y-2 text-sm text-gray-300">
+                  <p><strong>Step 1:</strong> Click "⏱️ Enhanced Restart (20s)" button</p>
+                  <p><strong>Step 2:</strong> Redis container stops for 20 seconds</p>
+                  <p><strong>Step 3:</strong> System automatically falls back to MySQL</p>
+                  <p><strong>Step 4:</strong> Redis container restarts after 20 seconds</p>
+                  <p><strong>Step 5:</strong> Active reconnection attempts begin</p>
+                  <p><strong>Step 6:</strong> System switches back to Redis when connected</p>
+                </div>
+                <p class="text-gray-300 text-sm mt-3"><strong>Expected Behavior:</strong> Zero downtime, automatic fallback, seamless recovery</p>
+              </div>
+            </div>
+            
+            <div>
+              <h4 class="font-semibold text-gray-200 mb-3">2. Loop Testing with Redis Resilience</h4>
+              <div class="bg-gray-800 p-4 rounded-lg">
+                <p class="text-gray-300 text-sm mb-3"><strong>Purpose:</strong> Test Redis resilience during high-load scenarios</p>
+                <div class="space-y-2 text-sm text-gray-300">
+                  <p><strong>Setup:</strong> Enter search query and iteration count (e.g., "John Doe", 1000)</p>
+                  <p><strong>Normal Operation:</strong> Data served from Redis cache</p>
+                  <p><strong>During Redis Outage:</strong> Automatic fallback to MySQL</p>
+                  <p><strong>Recovery:</strong> Automatic switch back to Redis</p>
+                  <p><strong>Monitoring:</strong> Real-time progress and source change logging</p>
+                </div>
+                <p class="text-gray-300 text-sm mt-3"><strong>Expected Behavior:</strong> Continuous operation regardless of Redis status</p>
+              </div>
+            </div>
+            
+            <div>
+              <h4 class="font-semibold text-gray-200 mb-3">3. Authentication Failure Simulation</h4>
+              <div class="bg-gray-800 p-4 rounded-lg">
+                <p class="text-gray-300 text-sm mb-3"><strong>Purpose:</strong> Test Redis authentication error handling</p>
+                <div class="space-y-2 text-sm text-gray-300">
+                  <p><strong>Step 1:</strong> Click "🔐 Simulate Auth Failure" button</p>
+                  <p><strong>Step 2:</strong> Redis password is changed to incorrect value</p>
+                  <p><strong>Step 3:</strong> Connection fails with authentication error</p>
+                  <p><strong>Step 4:</strong> System falls back to MySQL</p>
+                  <p><strong>Recovery:</strong> Use "🔓 Reset Redis Auth" to restore connection</p>
+                </div>
+                <p class="text-gray-300 text-sm mt-3"><strong>Expected Behavior:</strong> Graceful handling of auth errors, continued operation</p>
+              </div>
+            </div>
+            
+            <div>
+              <h4 class="font-semibold text-gray-200 mb-3">4. User Search with Source Tracking</h4>
+              <div class="bg-gray-800 p-4 rounded-lg">
+                <p class="text-gray-300 text-sm mb-3"><strong>Purpose:</strong> Demonstrate Redis-first strategy with fallback</p>
+                <div class="space-y-2 text-sm text-gray-300">
+                  <p><strong>Redis Available:</strong> Data served from cache (fast response)</p>
+                  <p><strong>Redis Down:</strong> Data fetched from MySQL (slower but reliable)</p>
+                  <p><strong>Cache Warming:</strong> New data automatically cached in Redis</p>
+                  <p><strong>Source Logging:</strong> Clear indication of data source</p>
+                </div>
+                <p class="text-gray-300 text-sm mt-3"><strong>Expected Behavior:</strong> Optimal performance with guaranteed availability</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="glass-dark glass-hover p-6 rounded-lg mb-6">
+          <h3 class="text-xl font-semibold text-gray-100 mb-4">❌ Common Redis Implementation Shortcomings (Addressed)</h3>
+          <div class="space-y-4">
+            <div class="bg-red-900 bg-opacity-30 border border-red-600 p-4 rounded-lg">
+              <h4 class="font-semibold text-red-300 mb-2">🚨 Traditional Redis Cache Manager Issues</h4>
+              <div class="space-y-3 text-sm text-gray-300">
+                <div>
+                  <p class="font-medium text-red-200">1. Basic Connection Handling</p>
+                  <p class="text-gray-400 ml-4">• Simple try-catch blocks without retry logic</p>
+                  <p class="text-gray-400 ml-4">• Application crashes when Redis is unavailable</p>
+                  <p class="text-gray-400 ml-4">• No connection pooling or health checks</p>
+                </div>
+                <div>
+                  <p class="font-medium text-red-200">2. Missing Resilience Configuration</p>
+                  <p class="text-gray-400 ml-4">• Default ioredis settings without optimization</p>
+                  <p class="text-gray-400 ml-4">• No retryStrategy or exponential backoff</p>
+                  <p class="text-gray-400 ml-4">• Missing autoResendUnfulfilledCommands</p>
+                </div>
+                <div>
+                  <p class="font-medium text-red-200">3. No Fallback Mechanism</p>
+                  <p class="text-gray-400 ml-4">• Complete application failure during Redis outages</p>
+                  <p class="text-gray-400 ml-4">• No alternative data sources</p>
+                  <p class="text-gray-400 ml-4">• Poor user experience during downtime</p>
+                </div>
+                <div>
+                  <p class="font-medium text-red-200">4. Limited Error Handling</p>
+                  <p class="text-gray-400 ml-4">• Generic error messages</p>
+                  <p class="text-gray-400 ml-4">• No detailed logging or monitoring</p>
+                  <p class="text-gray-400 ml-4">• Difficult to troubleshoot issues</p>
+                </div>
+                <div>
+                  <p class="font-medium text-red-200">5. No Circuit Breaker Pattern</p>
+                  <p class="text-gray-400 ml-4">• Continuous retries during outages</p>
+                  <p class="text-gray-400 ml-4">• Resource exhaustion</p>
+                  <p class="text-gray-400 ml-4">• Cascading failures</p>
+                </div>
+                <div>
+                  <p class="font-medium text-red-200">6. Missing Health Monitoring</p>
+                  <p class="text-gray-400 ml-4">• No proactive health checks</p>
+                  <p class="text-gray-400 ml-4">• Reactive problem detection</p>
+                  <p class="text-gray-400 ml-4">• No real-time status tracking</p>
+                </div>
+              </div>
+            </div>
+            
+            <div class="bg-green-900 bg-opacity-30 border border-green-600 p-4 rounded-lg">
+              <h4 class="font-semibold text-green-300 mb-2">✅ Our POC Solutions & Improvements</h4>
+              <div class="space-y-3 text-sm text-gray-300">
+                <div>
+                  <p class="font-medium text-green-200">1. Advanced Connection Management</p>
+                  <p class="text-gray-400 ml-4">• Exponential backoff retry strategy</p>
+                  <p class="text-gray-400 ml-4">• Stuck retry loop detection and auto-reset</p>
+                  <p class="text-gray-400 ml-4">• Comprehensive connection lifecycle management</p>
+                </div>
+                <div>
+                  <p class="font-medium text-green-200">2. Production-Ready ioredis Configuration</p>
+                  <p class="text-gray-400 ml-4">• Optimized retryStrategy with jitter</p>
+                  <p class="text-gray-400 ml-4">• autoResendUnfulfilledCommands enabled</p>
+                  <p class="text-gray-400 ml-4">• Proper timeout and keepAlive settings</p>
+                </div>
+                <div>
+                  <p class="font-medium text-green-200">3. Intelligent Fallback System</p>
+                  <p class="text-gray-400 ml-4">• MySQL fallback during Redis outages</p>
+                  <p class="text-gray-400 ml-4">• Automatic cache warming when Redis recovers</p>
+                  <p class="text-gray-400 ml-4">• Zero downtime guarantee</p>
+                </div>
+                <div>
+                  <p class="font-medium text-green-200">4. Comprehensive Error Handling</p>
+                  <p class="text-gray-400 ml-4">• Detailed error logging and tracking</p>
+                  <p class="text-gray-400 ml-4">• Real-time source change notifications</p>
+                  <p class="text-gray-400 ml-4">• Easy debugging and troubleshooting</p>
+                </div>
+                <div>
+                  <p class="font-medium text-green-200">5. Circuit Breaker Implementation</p>
+                  <p class="text-gray-400 ml-4">• Smart retry limits with auto-reset</p>
+                  <p class="text-gray-400 ml-4">• Resource optimization</p>
+                  <p class="text-gray-400 ml-4">• Prevention of cascading failures</p>
+                </div>
+                <div>
+                  <p class="font-medium text-green-200">6. Real-Time Health Monitoring</p>
+                  <p class="text-gray-400 ml-4">• Continuous connection status tracking</p>
+                  <p class="text-gray-400 ml-4">• Proactive health checks</p>
+                  <p class="text-gray-400 ml-4">• Real-time UI updates and notifications</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="glass-dark glass-hover p-6 rounded-lg">
+          <h3 class="text-xl font-semibold text-gray-100 mb-4">🎯 Conclusion</h3>
+          <p class="text-gray-300 leading-relaxed">
+            This Redis resilience implementation provides a robust, production-ready solution for handling Redis outages and connection failures. The comprehensive approach ensures high availability, data consistency, automatic recovery, real-time monitoring, and performance optimization with minimal impact on application performance.
+          </p>
+          <p class="text-gray-300 leading-relaxed mt-4">
+            The implementation follows industry best practices and provides a solid foundation for production deployments requiring high availability and fault tolerance.
+          </p>
+        </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    /* Custom scrollbar for the POC modal */
+    #pocModal .overflow-y-auto::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    #pocModal .overflow-y-auto::-webkit-scrollbar-track {
+      background: rgba(55, 65, 81, 0.3);
+      border-radius: 4px;
+    }
+    
+    #pocModal .overflow-y-auto::-webkit-scrollbar-thumb {
+      background: rgba(156, 163, 175, 0.5);
+      border-radius: 4px;
+    }
+    
+    #pocModal .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+      background: rgba(156, 163, 175, 0.7);
+    }
+    
+    /* Ensure the modal content is scrollable */
+    #pocModal .overflow-y-auto {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(156, 163, 175, 0.5) rgba(55, 65, 81, 0.3);
+    }
+  </style>
+
+  <script>
+    // Toggle section visibility
+    function toggleSection(sectionId) {
+      const content = document.getElementById(sectionId + 'Content');
+      const toggle = document.getElementById(sectionId + 'Toggle');
+      
+      if (content.style.display === 'none') {
+        content.style.display = 'block';
+        toggle.textContent = '▼';
+      } else {
+        content.style.display = 'none';
+        toggle.textContent = '▶';
+      }
+    }
+  </script>
+</body>
+</html> 
