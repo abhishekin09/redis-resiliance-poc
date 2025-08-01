@@ -14,19 +14,19 @@ class RedisManager {
     
     // Retry configuration
     this.retryConfig = {
-      maxRetries: 5,
+      maxRetries: 3, // Reduced from 5 to 3
       baseDelay: 1000, // 1 second
       maxDelay: 30000, // 30 seconds
       backoffMultiplier: 2,
       jitter: 0.1, // 10% jitter
       healthCheckInterval: 5000, // 5 seconds
       healthCheckTimeout: 3000, // 3 seconds
-      crashRecoveryTimeout: 60000, // 1 minute
+      crashRecoveryTimeout: 60000, // 60 seconds (1 minute)
       restartRecoveryTimeout: 30000, // 30 seconds
-      circuitBreakerThreshold: 5, // Number of failures before opening circuit
-      circuitBreakerTimeout: 30000, // Time to wait before trying again (30 seconds)
-      autoRecoveryCheckInterval: 10000, // Check every 10 seconds for Redis availability
-      maxStuckRetryTime: 120000 // 2 minutes - if stuck in retry for this long, force reset
+      circuitBreakerThreshold: 3, // Reduced from 5 to 3 (matches maxRetries)
+      circuitBreakerTimeout: 30000, // 30 seconds
+      autoRecoveryCheckInterval: 10000, // 10 seconds
+      maxStuckRetryTime: 120000 // 120 seconds (2 minutes)
     };
     
     // Event listeners
@@ -254,7 +254,7 @@ class RedisManager {
         this.connectionAttempts = times;
         
         // Stop retrying if we've had too many auth failures
-        if (this.status === 'Auth Failed' && times > 3) {
+        if (this.status === 'Auth Failed' && times > 2) { // Reduced from 3 to 2
           console.log('[🚫] Stopping retry due to authentication failure');
           this.recordFailure();
           return false;
