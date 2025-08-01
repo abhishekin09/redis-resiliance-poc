@@ -225,12 +225,21 @@ app.post('/test-loop/:query/:count', async (req, res) => {
   const { query, count } = req.params;
   let loopCount = parseInt(count) || 100;
   
+  // Check if client wants to use basic Redis
+  const useBasicRedis = req.query.basic === 'true';
+  
   // Limit the maximum number of iterations to prevent overwhelming the system
   const MAX_ITERATIONS = 10000000000000000000;
   if (loopCount > MAX_ITERATIONS) {
     loopCount = MAX_ITERATIONS;
     console.log(`[⚠️] Requested ${count} iterations, limited to ${MAX_ITERATIONS} for system safety`);
   }
+  
+  // Choose which Redis manager to use
+  const activeRedisManager = useBasicRedis ? basicRedisManager : redisManager;
+  const redisType = useBasicRedis ? 'Basic' : 'Enhanced';
+  
+  console.log(`[🔄] Loop test started: ${query} x ${loopCount} iterations using ${redisType} Redis`);
   
   // Check if client wants real-time updates
   const realTime = req.headers.accept && req.headers.accept.includes('text/event-stream');
@@ -282,16 +291,16 @@ app.post('/test-loop/:query/:count', async (req, res) => {
         let previousSource = results.length > 0 ? results[results.length - 1].source : null;
         
         // Check Redis connection status
-        if (redisManager.isConnected()) {
+        if (activeRedisManager.isConnected()) {
           redisStatus = 'connected';
           try {
-            const cachedUser = await redisManager.get(`user:${query}`);
+            const cachedUser = await activeRedisManager.get(`user:${query}`);
             if (cachedUser) {
               source = 'Redis';
-              user = JSON.parse(cachedUser);
+              user = cachedUser; // Basic Redis already returns parsed JSON
             }
           } catch (redisError) {
-            console.log(`[🔄] Redis error in iteration ${i + 1}:`, redisError.message);
+            console.log(`[🔄] ${redisType} Redis error in iteration ${i + 1}:`, redisError.message);
             redisStatus = 'error';
             // Continue with MySQL fallback
           }
@@ -299,7 +308,7 @@ app.post('/test-loop/:query/:count', async (req, res) => {
           redisStatus = 'disconnected';
           if (!redisRestartDetected) {
             redisRestartDetected = true;
-            console.log(`[🔄] Redis disconnected detected at iteration ${i + 1}`);
+            console.log(`[🔄] ${redisType} Redis disconnected detected at iteration ${i + 1}`);
           }
         }
         
@@ -320,16 +329,18 @@ app.post('/test-loop/:query/:count', async (req, res) => {
               user = rows[0];
               
               // Try to cache in Redis for future requests (360 seconds TTL - 6 minutes)
-              if (redisManager.isConnected()) {
+              if (activeRedisManager.isConnected()) {
                 try {
-                  await redisManager.set(`user:${query}`, JSON.stringify(user), 360);
+                  // Basic Redis expects JSON string, Enhanced Redis expects object
+                  const cacheData = useBasicRedis ? JSON.stringify(user) : user;
+                  await activeRedisManager.set(`user:${query}`, cacheData, 360);
                   // If we successfully cached and this was after a restart, mark recovery
                   if (redisRestartDetected && !redisRecoveryTime) {
                     redisRecoveryTime = new Date().toISOString();
-                    console.log(`[✅] Redis recovered at iteration ${i + 1}`);
+                    console.log(`[✅] ${redisType} Redis recovered at iteration ${i + 1}`);
                   }
                 } catch (cacheError) {
-                  console.log(`[⚠️] Failed to cache in Redis:`, cacheError.message);
+                  console.log(`[⚠️] Failed to cache in ${redisType} Redis:`, cacheError.message);
                 }
               }
             }
@@ -388,6 +399,7 @@ app.post('/test-loop/:query/:count', async (req, res) => {
         failedRequests: failedRequests,
         redisRequests: redisRequests,
         mysqlRequests: mysqlRequests,
+        redisType: redisType,
         redisRestartDetected: redisRestartDetected,
         redisRecoveryTime: redisRecoveryTime,
         message: `Loop test completed: ${successfulRequests} successful, ${failedRequests} failed`,
@@ -406,6 +418,7 @@ app.post('/test-loop/:query/:count', async (req, res) => {
         failedRequests: failedRequests,
         redisRequests: redisRequests,
         mysqlRequests: mysqlRequests,
+        redisType: redisType,
         redisRestartDetected: redisRestartDetected,
         redisRecoveryTime: redisRecoveryTime,
         results: results

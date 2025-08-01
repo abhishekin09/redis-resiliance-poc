@@ -1584,6 +1584,16 @@ async function runLoopTest() {
     }
   }
 
+  // Check if basic Redis is connected to determine which Redis to use
+  let useBasicRedis = false;
+  try {
+    const basicRedisResponse = await fetch('http://localhost:8000/basic-redis/health');
+    const basicRedisData = await basicRedisResponse.json();
+    useBasicRedis = basicRedisData.isConnected;
+  } catch (error) {
+    console.log('Basic Redis not available, using enhanced Redis');
+  }
+
   try {
     loopTestDetails.innerHTML = `
       <div class="text-blue-600 mb-4">
@@ -1602,7 +1612,7 @@ async function runLoopTest() {
     loopTestResult.classList.remove('hidden');
     
     // Run the loop test with detailed progress tracking
-    const results = await runDetailedLoopTest(query, count);
+    const results = await runDetailedLoopTest(query, count, useBasicRedis);
     
     // Display results
     displayLoopTestResults(results, query, count);
@@ -1622,7 +1632,7 @@ async function runLoopTest() {
   }
 }
 
-async function runDetailedLoopTest(query, count) {
+async function runDetailedLoopTest(query, count, useBasicRedis = false) {
   const results = {
     successful: 0,
     failed: 0,
@@ -1632,20 +1642,21 @@ async function runDetailedLoopTest(query, count) {
     errors: [],
     iterations: [],
     redisRestartDetected: false,
-    redisRecoveryTime: null
+    redisRecoveryTime: null,
+    redisType: useBasicRedis ? 'Basic' : 'Enhanced'
   };
   
   // Check if user wants real-time updates (for large iterations)
   const useRealTime = count > 1000;
   
   if (useRealTime) {
-    return await runRealTimeLoopTest(query, count, results);
+    return await runRealTimeLoopTest(query, count, results, useBasicRedis);
   } else {
-    return await runStandardLoopTest(query, count, results);
+    return await runStandardLoopTest(query, count, results, useBasicRedis);
   }
 }
 
-async function runRealTimeLoopTest(query, count, results) {
+async function runRealTimeLoopTest(query, count, results, useBasicRedis = false) {
   try {
     // Set up progress display
     const progressBar = document.getElementById('progressBar');
@@ -1669,7 +1680,8 @@ async function runRealTimeLoopTest(query, count, results) {
     `;
     
     // Create fetch request with streaming for real-time updates
-    const response = await fetch(`http://localhost:8000/test-loop/${encodeURIComponent(query)}/${count}`, {
+    const url = `http://localhost:8000/test-loop/${encodeURIComponent(query)}/${count}?basic=${useBasicRedis}`;
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Accept': 'text/event-stream'
@@ -1783,10 +1795,11 @@ async function runRealTimeLoopTest(query, count, results) {
   }
 }
 
-async function runStandardLoopTest(query, count, results) {
+async function runStandardLoopTest(query, count, results, useBasicRedis = false) {
   try {
     // Use the enhanced loop test endpoint that handles Redis restarts
-    const response = await fetch(`http://localhost:8000/test-loop/${encodeURIComponent(query)}/${count}`, {
+    const url = `http://localhost:8000/test-loop/${encodeURIComponent(query)}/${count}?basic=${useBasicRedis}`;
+    const response = await fetch(url, {
       method: 'POST'
     });
     
@@ -1881,7 +1894,7 @@ function displayLoopTestResults(results, query, count) {
           <div class="text-red-400 text-2xl font-bold">${results.failed}</div>
         </div>
         <div class="bg-blue-900 border border-blue-600 p-4 rounded-lg">
-          <div class="font-medium text-blue-200">📦 Redis</div>
+          <div class="font-medium text-blue-200">📦 Redis (${results.redisType || 'Enhanced'})</div>
           <div class="text-blue-400 text-2xl font-bold">${results.redisCount}</div>
         </div>
         <div class="bg-yellow-900 border border-yellow-600 p-4 rounded-lg">
