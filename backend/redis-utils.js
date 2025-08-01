@@ -7,6 +7,10 @@ class RedisManager {
     this.connectionAttempts = 0;
     this.healthCheckInterval = null;
     this.recoveryTimeout = null;
+    this.circuitBreakerState = 'CLOSED'; // CLOSED, OPEN, HALF_OPEN
+    this.circuitBreakerFailures = 0;
+    this.lastFailureTime = null;
+    this.autoRecoveryInterval = null;
     
     // Retry configuration
     this.retryConfig = {
@@ -18,7 +22,11 @@ class RedisManager {
       healthCheckInterval: 5000, // 5 seconds
       healthCheckTimeout: 3000, // 3 seconds
       crashRecoveryTimeout: 60000, // 1 minute
-      restartRecoveryTimeout: 30000 // 30 seconds
+      restartRecoveryTimeout: 30000, // 30 seconds
+      circuitBreakerThreshold: 5, // Number of failures before opening circuit
+      circuitBreakerTimeout: 30000, // Time to wait before trying again (30 seconds)
+      autoRecoveryCheckInterval: 10000, // Check every 10 seconds for Redis availability
+      maxStuckRetryTime: 120000 // 2 minutes - if stuck in retry for this long, force reset
     };
     
     // Event listeners
@@ -88,6 +96,124 @@ class RedisManager {
     }
   }
 
+  // Circuit breaker methods
+  recordFailure() {
+    this.circuitBreakerFailures++;
+    this.lastFailureTime = Date.now();
+    
+    if (this.circuitBreakerFailures >= this.retryConfig.circuitBreakerThreshold) {
+      this.circuitBreakerState = 'OPEN';
+      console.log(`[🚫] Circuit breaker OPEN - too many failures (${this.circuitBreakerFailures})`);
+      this.startAutoRecoveryCheck();
+    }
+  }
+
+  recordSuccess() {
+    this.circuitBreakerFailures = 0;
+    this.circuitBreakerState = 'CLOSED';
+    this.lastFailureTime = null;
+    this.stopAutoRecoveryCheck();
+    console.log('[✅] Circuit breaker CLOSED - connection successful');
+  }
+
+  isCircuitBreakerOpen() {
+    if (this.circuitBreakerState === 'OPEN') {
+      const timeSinceLastFailure = Date.now() - this.lastFailureTime;
+      if (timeSinceLastFailure >= this.retryConfig.circuitBreakerTimeout) {
+        this.circuitBreakerState = 'HALF_OPEN';
+        console.log('[🔄] Circuit breaker HALF_OPEN - attempting recovery');
+        return false;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  // Auto-recovery check for when Redis becomes available again
+  startAutoRecoveryCheck() {
+    if (this.autoRecoveryInterval) {
+      clearInterval(this.autoRecoveryInterval);
+    }
+    
+    console.log(`[🔄] Starting auto-recovery check every ${this.retryConfig.autoRecoveryCheckInterval}ms`);
+    
+    this.autoRecoveryInterval = setInterval(async () => {
+      if (this.circuitBreakerState === 'OPEN' || this.circuitBreakerState === 'HALF_OPEN') {
+        try {
+          // Try to ping Redis to see if it's available
+          const testRedis = new Redis({
+            host: process.env.REDIS_HOST || 'redis',
+            port: 6379,
+            connectTimeout: 3000,
+            commandTimeout: 2000,
+            lazyConnect: true
+          });
+          
+          await testRedis.ping();
+          await testRedis.disconnect();
+          
+          console.log('[✅] Redis is available again, attempting reconnection');
+          this.forceResetConnection();
+          
+        } catch (error) {
+          // Redis still not available, continue waiting
+          console.log(`[⏳] Redis still unavailable: ${error.message}`);
+        }
+      }
+    }, this.retryConfig.autoRecoveryCheckInterval);
+  }
+
+  stopAutoRecoveryCheck() {
+    if (this.autoRecoveryInterval) {
+      clearInterval(this.autoRecoveryInterval);
+      this.autoRecoveryInterval = null;
+      console.log('[🛑] Stopped auto-recovery check');
+    }
+  }
+
+  // Force reset connection when stuck
+  async forceResetConnection() {
+    console.log('[🔄] Force resetting Redis connection');
+    
+    try {
+      // Disconnect existing connection
+      if (this.redis) {
+        this.redis.removeAllListeners();
+        await this.redis.disconnect();
+        this.redis = null;
+      }
+      
+      // Reset state
+      this.status = 'Disconnected';
+      this.connectionAttempts = 0;
+      this.circuitBreakerFailures = 0;
+      this.circuitBreakerState = 'CLOSED';
+      this.lastFailureTime = null;
+      
+      // Stop all intervals
+      this.stopHealthCheck();
+      this.stopAutoRecoveryCheck();
+      
+      // Wait a moment before reconnecting
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Attempt fresh connection
+      this.connect();
+      
+    } catch (error) {
+      console.error('[❌] Error during force reset:', error.message);
+    }
+  }
+
+  // Check if connection is stuck in retry loop
+  isStuckInRetryLoop() {
+    if (this.lastFailureTime && this.connectionAttempts > this.retryConfig.maxRetries) {
+      const timeSinceLastFailure = Date.now() - this.lastFailureTime;
+      return timeSinceLastFailure > this.retryConfig.maxStuckRetryTime;
+    }
+    return false;
+  }
+
   // Event emitter methods
   on(event, callback) {
     if (this.eventListeners[event]) {
@@ -105,6 +231,19 @@ class RedisManager {
   connect() {
     console.log('[🔌] Attempting to connect to Redis...');
     
+    // Check circuit breaker state
+    if (this.isCircuitBreakerOpen()) {
+      console.log('[🚫] Circuit breaker is OPEN, not attempting connection');
+      return;
+    }
+    
+    // Check if stuck in retry loop
+    if (this.isStuckInRetryLoop()) {
+      console.log('[⚠️] Detected stuck retry loop, forcing connection reset');
+      this.forceResetConnection();
+      return;
+    }
+    
     // Reset connection attempts when starting a new connection
     this.connectionAttempts = 0;
     
@@ -117,12 +256,14 @@ class RedisManager {
         // Stop retrying if we've had too many auth failures
         if (this.status === 'Auth Failed' && times > 3) {
           console.log('[🚫] Stopping retry due to authentication failure');
+          this.recordFailure();
           return false;
         }
         
         // Stop retrying if we've exceeded max retries
         if (times > this.retryConfig.maxRetries) {
           console.log(`[🚫] Stopping retry after ${times} attempts`);
+          this.recordFailure();
           return false;
         }
         
@@ -151,6 +292,7 @@ class RedisManager {
     this.redis.on('connect', () => {
       this.status = 'Connected';
       this.connectionAttempts = 0;
+      this.recordSuccess();
       console.log('[✔️] Connected to Redis successfully');
       this.startHealthCheck();
       this.emit('connect');
@@ -168,6 +310,7 @@ class RedisManager {
       } else {
         this.status = 'Error';
         console.error('[❌] Redis Error:', err.message);
+        this.recordFailure();
       }
       this.stopHealthCheck();
       this.emit('error', err);

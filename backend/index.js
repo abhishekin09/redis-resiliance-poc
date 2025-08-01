@@ -488,13 +488,21 @@ app.get('/status', async (req, res) => {
 });
 
 app.get('/health', (req, res) => {
+  const uptime = process.uptime();
+  const redisStatus = redisManager.getStatus();
+  const connectionAttempts = redisManager.getConnectionAttempts();
+  const circuitBreakerState = redisManager.circuitBreakerState;
+  const isStuckInRetry = redisManager.isStuckInRetryLoop();
+  
   res.json({
     service: 'Redis Resilience PoC',
     version: '1.0.0',
-    uptime: process.uptime(),
-    redisStatus: redisManager.getStatus(),
-    connectionAttempts: redisManager.getConnectionAttempts(),
-    status: redisManager.getStatus() === 'Connected' ? 'healthy' : 'degraded'
+    uptime: uptime,
+    redisStatus: redisStatus,
+    connectionAttempts: connectionAttempts,
+    circuitBreakerState: circuitBreakerState,
+    isStuckInRetry: isStuckInRetry,
+    status: redisStatus === 'Connected' ? 'healthy' : 'degraded'
   });
 });
 
@@ -1183,9 +1191,9 @@ app.post('/reconnect', async (req, res) => {
     console.log('[🔄] Manual reconnect requested...');
     
     // Check if connection is stuck first
-    if (redisManager.isStuckInRetry()) {
+    if (redisManager.isStuckInRetryLoop()) {
       console.log('[🔄] Connection appears stuck, performing forced reset...');
-      await redisManager.forceResetIfStuck();
+      await redisManager.forceResetConnection();
       res.json({ 
         message: 'Forced connection reset initiated due to stuck retry loop',
         wasStuck: true,
@@ -1204,6 +1212,25 @@ app.post('/reconnect', async (req, res) => {
     console.error('[❌] Error during reconnect:', error);
     res.status(500).json({
       error: 'Failed to reconnect',
+      message: error.message
+    });
+  }
+});
+
+// Force reset endpoint for manual intervention
+app.post('/force-reset', async (req, res) => {
+  try {
+    console.log('[🔄] Force reset requested...');
+    await redisManager.forceResetConnection();
+    res.json({ 
+      message: 'Force reset initiated',
+      status: redisManager.getStatus(),
+      circuitBreakerState: redisManager.circuitBreakerState
+    });
+  } catch (error) {
+    console.error('[❌] Error during force reset:', error);
+    res.status(500).json({
+      error: 'Failed to force reset',
       message: error.message
     });
   }
@@ -1237,9 +1264,20 @@ app.listen(PORT, () => {
   setInterval(async () => {
     try {
       // Check if connection is stuck and auto-reset if needed
-      if (redisManager.isStuckInRetry()) {
-        console.log('[🔄] Auto-detected stuck connection, performing reset...');
-        await redisManager.forceResetIfStuck();
+      if (redisManager.isStuckInRetryLoop()) {
+        console.log('[🔄] Auto-detected stuck retry loop, performing force reset...');
+        await redisManager.forceResetConnection();
+      }
+      
+      // Check circuit breaker state
+      if (redisManager.isCircuitBreakerOpen()) {
+        console.log('[🚫] Circuit breaker is OPEN, Redis connection blocked');
+      }
+      
+      // If Redis is disconnected and circuit breaker is closed, try to reconnect
+      if (redisManager.getStatus() === 'Disconnected' && !redisManager.isCircuitBreakerOpen()) {
+        console.log('[🔄] Redis disconnected, attempting reconnection...');
+        redisManager.connect();
       }
     } catch (error) {
       console.error('[❌] Error in connection health check:', error);
