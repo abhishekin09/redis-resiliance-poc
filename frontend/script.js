@@ -264,7 +264,7 @@ function updateAllContainersDisplay() {
               <div>
                 <div class="font-semibold text-gray-100">${container.name}</div>
                 <div class="text-xs text-gray-400">${container.containerId.substring(0, 12)}...</div>
-              </div>
+            </div>
             </div>
             <span class="font-medium ${stateColor} text-lg">${container.state.toUpperCase()}</span>
           </div>
@@ -1873,35 +1873,35 @@ function displayLoopTestResults(results, query, count) {
       return `<span class="${color} font-semibold">${code}: ${count}</span>`;
     })
     .join(' | ');
-  
-  loopTestDetails.innerHTML = `
+      
+      loopTestDetails.innerHTML = `
     <div class="space-y-6">
       <!-- Clear Results Button -->
       <div class="flex justify-end">
         <button onclick="clearLoopTestResults()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 transform hover:scale-105 shadow-lg">
           🗑️ Clear Results
         </button>
-      </div>
+            </div>
       
       <!-- Summary Cards -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div class="bg-green-900 border border-green-600 p-4 rounded-lg">
           <div class="font-medium text-green-200">✅ Successful</div>
           <div class="text-green-400 text-2xl font-bold">${results.successful}</div>
-        </div>
+            </div>
         <div class="bg-red-900 border border-red-600 p-4 rounded-lg">
           <div class="font-medium text-red-200">❌ Failed</div>
           <div class="text-red-400 text-2xl font-bold">${results.failed}</div>
-        </div>
+          </div>
         <div class="bg-blue-900 border border-blue-600 p-4 rounded-lg">
           <div class="font-medium text-blue-200">📦 Redis (${results.redisType || 'Enhanced'})</div>
           <div class="text-blue-400 text-2xl font-bold">${results.redisCount}</div>
-        </div>
+            </div>
         <div class="bg-yellow-900 border border-yellow-600 p-4 rounded-lg">
           <div class="font-medium text-yellow-200">🗄️ MySQL</div>
           <div class="text-yellow-400 text-2xl font-bold">${results.mysqlCount}</div>
-        </div>
-      </div>
+            </div>
+          </div>
       
       <!-- Redis Restart Information -->
       ${results.redisRestartDetected ? `
@@ -1965,15 +1965,15 @@ function displayLoopTestResults(results, query, count) {
         Query: ${query} | Total Iterations: ${count} | 
         Redis Success Rate: ${((results.redisCount / results.successful) * 100).toFixed(1)}% |
         Overall Success Rate: ${((results.successful / count) * 100).toFixed(1)}%
-      </div>
-    </div>
-  `;
-  
-  addToHistory({
-    status: 'LOOP_TEST_COMPLETE',
+          </div>
+        </div>
+      `;
+      
+      addToHistory({
+        status: 'LOOP_TEST_COMPLETE',
     redisStatus: `${results.redisCount} Redis, ${results.mysqlCount} MySQL`,
-    timestamp: new Date()
-  });
+        timestamp: new Date()
+      });
 }
 
 // Function to clear loop test results
@@ -1986,13 +1986,13 @@ function clearLoopTestResults() {
   loopTestResult.classList.add('hidden');
   
   // Clear the details
-  loopTestDetails.innerHTML = `
+    loopTestDetails.innerHTML = `
     <div class="text-gray-400 text-center py-8">
       <div class="text-2xl mb-2">📊</div>
       <div>No loop test results available</div>
       <div class="text-sm mt-2">Run a loop test to see results here</div>
-    </div>
-  `;
+      </div>
+    `;
 }
 
 // Initialize on page load
@@ -2031,7 +2031,7 @@ window.onload = function() {
   setTimeout(() => {
     startLogsAutoRefresh();
   }, 2000);
-};
+}; 
 
 // POC Document Modal Functions
 function showPOCDocument() {
@@ -2252,4 +2252,395 @@ function showBasicRedisResults(data, simulationType) {
     existingResults.remove();
   }
   container.insertAdjacentHTML('beforeend', resultsHtml);
+}
+
+// MultiCacheManager Demo Functions
+async function initMultiCache() {
+  const btn = document.querySelector('button[onclick="initMultiCache()"]');
+  const originalText = btn.textContent;
+  
+  try {
+    btn.textContent = '🔧 Initializing...';
+    btn.disabled = true;
+    btn.className = 'bg-blue-700 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform scale-95 shadow-lg cursor-not-allowed';
+    
+    const response = await fetch('http://localhost:8000/multi-cache/init', { method: 'POST' });
+    const data = await response.json();
+    
+    if (response.ok) {
+      btn.textContent = '✅ Initialized!';
+      btn.className = 'bg-green-600 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform scale-95 shadow-lg';
+      
+      // Update status display
+      updateMultiCacheStatus(data.status);
+      
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.disabled = false;
+        btn.className = 'bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105';
+      }, 2000);
+    }
+  } catch (error) {
+    console.error('MultiCache initialization failed:', error);
+    btn.textContent = '❌ Failed';
+    btn.className = 'bg-red-600 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform scale-95 shadow-lg';
+    
+    updateMultiCacheResults({ error: error.message }, 'Initialization Failed');
+    
+    setTimeout(() => {
+      btn.textContent = originalText;
+      btn.disabled = false;
+      btn.className = 'bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105';
+    }, 2000);
+  }
+}
+
+async function testMultiCacheRaceConditions() {
+  const btn = document.querySelector('button[onclick="testMultiCacheRaceConditions()"]');
+  const originalText = btn.textContent;
+  
+  try {
+    btn.textContent = '🏁 Testing...';
+    btn.disabled = true;
+    btn.className = 'bg-orange-700 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform scale-95 shadow-lg cursor-not-allowed';
+    
+    const response = await fetch('http://localhost:8000/multi-cache/demo-race-conditions', { method: 'POST' });
+    const data = await response.json();
+    
+    if (response.ok) {
+      btn.textContent = '✅ Tested!';
+      btn.className = 'bg-green-600 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform scale-95 shadow-lg';
+      
+      // Update status and results
+      updateMultiCacheStatus(data.status);
+      updateMultiCacheResults(data.results, 'Race Condition Test');
+      
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.disabled = false;
+        btn.className = 'bg-orange-600 hover:bg-orange-700 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105';
+      }, 2000);
+    }
+  } catch (error) {
+    console.error('Race condition test failed:', error);
+    btn.textContent = '❌ Failed';
+    btn.className = 'bg-red-600 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform scale-95 shadow-lg';
+    
+    updateMultiCacheResults({ error: error.message }, 'Race Condition Test Failed');
+    
+    setTimeout(() => {
+      btn.textContent = originalText;
+      btn.disabled = false;
+      btn.className = 'bg-orange-600 hover:bg-orange-700 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105';
+    }, 2000);
+  }
+}
+
+async function simulateMultiCacheProblems() {
+  const btn = document.querySelector('button[onclick="simulateMultiCacheProblems()"]');
+  const originalText = btn.textContent;
+  
+  try {
+    btn.textContent = '⚠️ Simulating...';
+    btn.disabled = true;
+    btn.className = 'bg-red-700 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform scale-95 shadow-lg cursor-not-allowed';
+    
+    const response = await fetch('http://localhost:8000/multi-cache/simulate-problems', { method: 'POST' });
+    const data = await response.json();
+    
+    if (response.ok) {
+      btn.textContent = '✅ Complete!';
+      btn.className = 'bg-green-600 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform scale-95 shadow-lg';
+      
+      // Update status and results
+      updateMultiCacheStatus(data.status);
+      updateMultiCacheResults(data.results, 'All Problems Simulation');
+      
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.disabled = false;
+        btn.className = 'bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105';
+      }, 2000);
+    }
+  } catch (error) {
+    console.error('Problem simulation failed:', error);
+    btn.textContent = '❌ Failed';
+    btn.className = 'bg-red-600 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform scale-95 shadow-lg';
+    
+    updateMultiCacheResults({ error: error.message }, 'Problem Simulation Failed');
+    
+    setTimeout(() => {
+      btn.textContent = originalText;
+      btn.disabled = false;
+      btn.className = 'bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105';
+    }, 2000);
+  }
+}
+
+async function compareAllCaches() {
+  const btn = document.querySelector('button[onclick="compareAllCaches()"]');
+  const originalText = btn.textContent;
+  
+  try {
+    btn.textContent = '⚖️ Comparing...';
+    btn.disabled = true;
+    btn.className = 'bg-purple-700 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform scale-95 shadow-lg cursor-not-allowed';
+    
+    // Test with a sample query
+    const testQuery = 'John Doe';
+    const response = await fetch(`http://localhost:8000/multi-cache/compare/${encodeURIComponent(testQuery)}`);
+    const data = await response.json();
+    
+    if (response.ok) {
+      btn.textContent = '✅ Compared!';
+      btn.className = 'bg-green-600 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform scale-95 shadow-lg';
+      
+      // Update results with comparison data
+      updateMultiCacheResults(data, 'Cache Comparison');
+      
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.disabled = false;
+        btn.className = 'bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105';
+      }, 2000);
+    }
+  } catch (error) {
+    console.error('Cache comparison failed:', error);
+    btn.textContent = '❌ Failed';
+    btn.className = 'bg-red-600 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform scale-95 shadow-lg';
+    
+    updateMultiCacheResults({ error: error.message }, 'Cache Comparison Failed');
+    
+    setTimeout(() => {
+      btn.textContent = originalText;
+      btn.disabled = false;
+      btn.className = 'bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-105';
+    }, 2000);
+  }
+}
+
+function updateMultiCacheStatus(status) {
+  const statusDiv = document.getElementById('multiCacheStatus');
+  
+  if (!status) {
+    statusDiv.innerHTML = '<div class="text-gray-400">No status data available</div>';
+    return;
+  }
+  
+  statusDiv.innerHTML = `
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+      <div>
+        <span class="text-gray-400">Initialized:</span>
+        <span class="text-${status.initialized ? 'green' : 'red'}-400 font-medium">${status.initialized ? 'Yes' : 'No'}</span>
+      </div>
+      <div>
+        <span class="text-gray-400">Redis Connected:</span>
+        <span class="text-${status.redisConnected ? 'green' : 'red'}-400 font-medium">${status.redisConnected ? 'Yes' : 'No'}</span>
+      </div>
+      <div>
+        <span class="text-gray-400">Redis Status:</span>
+        <span class="text-yellow-400 font-medium">${status.redisStatus || 'Unknown'}</span>
+      </div>
+      <div>
+        <span class="text-gray-400">Memory Entries:</span>
+        <span class="text-blue-400 font-medium">${status.memoryEntries || 0}</span>
+      </div>
+      <div>
+        <span class="text-gray-400">Operation Count:</span>
+        <span class="text-green-400 font-medium">${status.operationCount || 0}</span>
+      </div>
+      <div>
+        <span class="text-gray-400">Lock Initialized:</span>
+        <span class="text-${status.lockInitialized ? 'green' : 'red'}-400 font-medium">${status.lockInitialized ? 'Yes' : 'No'}</span>
+      </div>
+    </div>
+    
+    ${status.problems ? `
+      <div class="mt-4">
+        <h4 class="text-red-400 font-medium mb-2">🚨 Detected Problems (${status.problems.length}):</h4>
+        <ul class="text-red-300 text-xs space-y-1 max-h-32 overflow-y-auto">
+          ${status.problems.map(problem => `<li>• ${problem}</li>`).join('')}
+        </ul>
+      </div>
+    ` : ''}
+    
+    ${status.impact ? `
+      <div class="mt-4">
+        <h4 class="text-orange-400 font-medium mb-2">⚠️ Performance Impact (${status.impact.length}):</h4>
+        <ul class="text-orange-300 text-xs space-y-1 max-h-32 overflow-y-auto">
+          ${status.impact.map(impact => `<li>• ${impact}</li>`).join('')}
+        </ul>
+      </div>
+    ` : ''}
+  `;
+}
+
+function updateMultiCacheResults(results, testType) {
+  const resultsDiv = document.getElementById('multiCacheResults');
+  
+  if (!results) {
+    resultsDiv.innerHTML = '<div class="text-gray-400">No results available</div>';
+    return;
+  }
+  
+  if (results.error) {
+    resultsDiv.innerHTML = `
+      <div class="bg-red-900 border border-red-600 rounded-lg p-4">
+        <h4 class="text-red-200 font-medium mb-2">${testType}</h4>
+        <div class="text-red-300">❌ Error: ${results.error}</div>
+      </div>
+    `;
+    return;
+  }
+  
+  let resultsHtml = `
+    <div class="bg-gray-700 border border-gray-600 rounded-lg p-4">
+      <h4 class="text-gray-100 font-medium mb-4">${testType} Results</h4>
+  `;
+  
+  // Handle different result types
+  if (testType === 'Race Condition Test') {
+    resultsHtml += `
+      <div class="space-y-3">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <span class="text-gray-400">Concurrent Requests:</span>
+            <span class="text-blue-400 font-medium">${results.concurrent || 'Unknown'}</span>
+          </div>
+          <div>
+            <span class="text-gray-400">Successes:</span>
+            <span class="text-green-400 font-medium">${results.successes || 0}</span>
+          </div>
+          <div>
+            <span class="text-gray-400">Failures:</span>
+            <span class="text-red-400 font-medium">${results.failures || 0}</span>
+          </div>
+          <div>
+            <span class="text-gray-400">Race Condition:</span>
+            <span class="text-${results.raceConditionDetected ? 'red' : 'green'}-400 font-medium">
+              ${results.raceConditionDetected ? '❌ Detected' : '✅ None'}
+            </span>
+          </div>
+        </div>
+        
+        ${results.raceConditionDetected ? `
+          <div class="bg-red-900 bg-opacity-50 border border-red-600 rounded p-3">
+            <div class="text-red-300 font-medium">🚨 Race Condition Detected!</div>
+            <div class="text-red-400 text-sm mt-1">
+              Multiple function calls were made for the same cache key due to lazy lock initialization.
+            </div>
+          </div>
+        ` : `
+          <div class="bg-green-900 bg-opacity-50 border border-green-600 rounded p-3">
+            <div class="text-green-300 font-medium">✅ No Race Conditions</div>
+            <div class="text-green-400 text-sm mt-1">
+              Cache operations completed without race conditions.
+            </div>
+          </div>
+        `}
+      </div>
+    `;
+  } else if (testType === 'All Problems Simulation') {
+    resultsHtml += `
+      <div class="space-y-3">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <span class="text-gray-400">Problems Detected:</span>
+            <span class="text-red-400 font-medium">${results.problemsDetected || 0}</span>
+          </div>
+          <div>
+            <span class="text-gray-400">Test Status:</span>
+            <span class="text-${results.problemsDetected > 0 ? 'red' : 'green'}-400 font-medium">
+              ${results.problemsDetected > 0 ? '❌ Issues Found' : '✅ No Issues'}
+            </span>
+          </div>
+        </div>
+        
+        ${results.problems && results.problems.length > 0 ? `
+          <div class="bg-red-900 bg-opacity-30 border border-red-600 rounded p-3">
+            <h5 class="text-red-300 font-medium mb-2">🚨 Problems Found:</h5>
+            <div class="space-y-2">
+              ${results.problems.map(problem => `
+                <div class="text-sm">
+                  <div class="text-red-400 font-medium">${problem.type.replace('_', ' ').toUpperCase()}</div>
+                  <div class="text-red-300">${problem.description}</div>
+                  ${problem.details ? `<div class="text-red-400 text-xs mt-1">${JSON.stringify(problem.details)}</div>` : ''}
+                  ${problem.error ? `<div class="text-red-400 text-xs mt-1">Error: ${problem.error}</div>` : ''}
+                  ${problem.timeMs ? `<div class="text-orange-400 text-xs mt-1">Time: ${problem.timeMs}ms</div>` : ''}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+        
+        ${results.recommendations && results.recommendations.length > 0 ? `
+          <div class="bg-green-900 bg-opacity-30 border border-green-600 rounded p-3">
+            <h5 class="text-green-300 font-medium mb-2">✅ Recommendations:</h5>
+            <ul class="text-green-400 text-sm space-y-1">
+              ${results.recommendations.map(rec => `<li>• ${rec}</li>`).join('')}
+            </ul>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  } else if (testType === 'Cache Comparison') {
+    resultsHtml += `
+      <div class="space-y-3">
+        <div class="text-sm text-gray-400 mb-2">Query: <span class="text-blue-400">${results.query}</span></div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="bg-green-900 bg-opacity-30 border border-green-600 rounded p-3">
+            <h5 class="text-green-300 font-medium mb-2">✅ Enhanced Redis</h5>
+            ${results.comparison.enhanced ? `
+              <div class="text-sm">
+                <div class="text-green-400">Source: ${results.comparison.enhanced.source}</div>
+                <div class="text-green-400">Response Time: ${results.comparison.enhanced.responseTime}ms</div>
+              </div>
+            ` : `
+              <div class="text-gray-400 text-sm">No data found</div>
+            `}
+          </div>
+          
+          <div class="bg-orange-900 bg-opacity-30 border border-orange-600 rounded p-3">
+            <h5 class="text-orange-300 font-medium mb-2">⚠️ Basic Redis</h5>
+            ${results.comparison.basic ? `
+              <div class="text-sm">
+                <div class="text-orange-400">Source: ${results.comparison.basic.source}</div>
+                <div class="text-orange-400">Response Time: ${results.comparison.basic.responseTime}ms</div>
+              </div>
+            ` : `
+              <div class="text-gray-400 text-sm">No data found</div>
+            `}
+          </div>
+          
+          <div class="bg-red-900 bg-opacity-30 border border-red-600 rounded p-3">
+            <h5 class="text-red-300 font-medium mb-2">❌ MultiCache</h5>
+            ${results.comparison.multi ? `
+              <div class="text-sm">
+                <div class="text-red-400">Source: ${results.comparison.multi.source}</div>
+                <div class="text-red-400">Response Time: ${results.comparison.multi.responseTime}ms</div>
+              </div>
+            ` : `
+              <div class="text-gray-400 text-sm">No data found</div>
+            `}
+          </div>
+        </div>
+        
+        ${results.comparison.errors && results.comparison.errors.length > 0 ? `
+          <div class="bg-red-900 bg-opacity-30 border border-red-600 rounded p-3">
+            <h5 class="text-red-300 font-medium mb-2">❌ Errors:</h5>
+            <div class="space-y-1">
+              ${results.comparison.errors.map(error => `
+                <div class="text-red-400 text-sm">${error.type}: ${error.error}</div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+  
+  resultsHtml += `</div>`;
+  
+  resultsDiv.innerHTML = resultsHtml;
 } 

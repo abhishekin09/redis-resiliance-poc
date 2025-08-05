@@ -35,10 +35,6 @@ class BasicRedisManager {
       lazyConnect: this.config.lazyConnect,
       keepAlive: this.config.keepAlive,
       family: this.config.family,
-      // NO retryStrategy - this is the key difference!
-      // NO circuit breaker
-      // NO auto-recovery
-      // NO stuck retry detection
     });
 
     this.redis.on('connect', () => {

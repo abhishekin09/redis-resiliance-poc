@@ -8,9 +8,21 @@ const Docker = require('dockerode');
 const redisManager = require('./redis-utils');
 const recoveryManager = require('./recovery-utils');
 const BasicRedisManager = require('./basic-redis-utils');
+const MultiCacheManager = require('./multi-cache-utils');
 
 // Initialize basic Redis manager for comparison
 const basicRedisManager = new BasicRedisManager();
+
+// Initialize MultiCacheManager for demonstrating problematic patterns
+const multiCacheManager = new MultiCacheManager('demo', {
+  host: process.env.REDIS_HOST || 'redis',
+  port: 6379,
+  db: 0,
+  auth: process.env.REDIS_AUTH,
+  cacheTTL: 300,
+  stdTTL: 600,
+  checkperiod: 120
+});
 
 // Initialize Docker client
 const docker = new Docker({
@@ -1540,6 +1552,238 @@ app.post('/clear-cache', async (req, res) => {
   } catch (error) {
     console.error('[❌] Error clearing cache:', error);
     res.status(500).json({ error: 'Failed to clear cache', message: error.message });
+  }
+});
+
+// MultiCacheManager Demo Endpoints
+// Initialize MultiCacheManager
+app.post('/multi-cache/init', async (req, res) => {
+  try {
+    console.log('[🔧] Initializing MultiCacheManager...');
+    multiCacheManager.initCache();
+    
+    res.json({
+      message: 'MultiCacheManager initialized',
+      status: multiCacheManager.getDetailedStatus()
+    });
+  } catch (error) {
+    console.error('[❌] Error initializing MultiCacheManager:', error);
+    res.status(500).json({
+      error: 'Failed to initialize MultiCacheManager',
+      message: error.message
+    });
+  }
+});
+
+// Get MultiCacheManager status
+app.get('/multi-cache/status', async (req, res) => {
+  try {
+    const status = multiCacheManager.getDetailedStatus();
+    res.json(status);
+  } catch (error) {
+    console.error('[❌] Error getting MultiCacheManager status:', error);
+    res.status(500).json({
+      error: 'Failed to get status',
+      message: error.message
+    });
+  }
+});
+
+// Demonstrate race conditions
+app.post('/multi-cache/demo-race-conditions', async (req, res) => {
+  try {
+    console.log('[🏁] Starting race condition demonstration...');
+    
+    const raceResult = await multiCacheManager.demonstrateRaceConditions(
+      'race-demo-key',
+      async () => {
+        console.log('[🔄] Function called - this should only happen once!');
+        await new Promise(resolve => setTimeout(resolve, 200)); // Simulate database call
+        return {
+          timestamp: Date.now(),
+          message: 'This function should only be called once for the same cache key',
+          randomId: Math.random().toString(36).substring(7)
+        };
+      },
+      5 // 5 concurrent requests
+    );
+    
+    res.json({
+      message: 'Race condition demonstration completed',
+      results: raceResult,
+      status: multiCacheManager.getDetailedStatus()
+    });
+  } catch (error) {
+    console.error('[❌] Error in race condition demo:', error);
+    res.status(500).json({
+      error: 'Failed to demonstrate race conditions',
+      message: error.message
+    });
+  }
+});
+
+// Simulate all MultiCacheManager problems
+app.post('/multi-cache/simulate-problems', async (req, res) => {
+  try {
+    console.log('[⚠️] Running comprehensive problem simulation...');
+    
+    const problemResults = await multiCacheManager.simulateProblems();
+    
+    res.json({
+      message: 'Problem simulation completed',
+      results: problemResults,
+      status: multiCacheManager.getDetailedStatus()
+    });
+  } catch (error) {
+    console.error('[❌] Error in problem simulation:', error);
+    res.status(500).json({
+      error: 'Failed to simulate problems',
+      message: error.message
+    });
+  }
+});
+
+// Test MultiCacheManager with user data
+app.get('/multi-cache/test-user/:query', async (req, res) => {
+  try {
+    const { query } = req.params;
+    console.log(`[🧪] Testing MultiCacheManager with user query: ${query}`);
+    
+    const startTime = Date.now();
+    
+    const result = await multiCacheManager.getCachedData(
+      `user-${query}`,
+      async () => {
+        console.log(`[🗄️] Simulating database call for user: ${query}`);
+        await new Promise(resolve => setTimeout(resolve, 100)); // Simulate DB latency
+        
+        // Simulate user data
+        return {
+          id: Math.floor(Math.random() * 1000),
+          name: query,
+          email: `${query.toLowerCase().replace(' ', '.')}@example.com`,
+          fetchedAt: new Date().toISOString(),
+          source: 'MultiCacheManager-Database-Simulation'
+        };
+      },
+      300 // 5 minutes TTL
+    );
+    
+    const responseTime = Date.now() - startTime;
+    
+    res.json({
+      user: result,
+      responseTime: responseTime,
+      cacheStatus: multiCacheManager.getDetailedStatus()
+    });
+  } catch (error) {
+    console.error('[❌] Error in MultiCacheManager user test:', error);
+    res.status(500).json({
+      error: 'Failed to test MultiCacheManager',
+      message: error.message
+    });
+  }
+});
+
+// Compare different cache implementations
+app.get('/multi-cache/compare/:query', async (req, res) => {
+  try {
+    const { query } = req.params;
+    console.log(`[⚖️] Comparing cache implementations for query: ${query}`);
+    
+    const results = {
+      enhanced: null,
+      basic: null,
+      multi: null,
+      errors: []
+    };
+    
+    // Test Enhanced Redis
+    try {
+      const enhancedStart = Date.now();
+      if (redisManager.isConnected()) {
+        const cachedUser = await redisManager.get(`user:${query}`);
+        if (cachedUser) {
+          results.enhanced = {
+            source: 'Redis',
+            responseTime: Date.now() - enhancedStart,
+            user: JSON.parse(cachedUser)
+          };
+        }
+      }
+    } catch (error) {
+      results.errors.push({ type: 'enhanced', error: error.message });
+    }
+    
+    // Test Basic Redis
+    try {
+      const basicStart = Date.now();
+      if (basicRedisManager.isConnected()) {
+        const cachedUser = await basicRedisManager.get(`user:${query}`);
+        if (cachedUser) {
+          results.basic = {
+            source: 'Redis',
+            responseTime: Date.now() - basicStart,
+            user: JSON.parse(cachedUser)
+          };
+        }
+      }
+    } catch (error) {
+      results.errors.push({ type: 'basic', error: error.message });
+    }
+    
+    // Test MultiCacheManager
+    try {
+      const multiStart = Date.now();
+      const multiResult = await multiCacheManager.getCachedData(
+        `user-${query}`,
+        async () => {
+          return { message: 'Fresh data from MultiCacheManager' };
+        },
+        300
+      );
+      results.multi = {
+        source: 'MultiCache',
+        responseTime: Date.now() - multiStart,
+        user: multiResult
+      };
+    } catch (error) {
+      results.errors.push({ type: 'multi', error: error.message });
+    }
+    
+    res.json({
+      query: query,
+      comparison: results,
+      status: {
+        enhanced: redisManager.getStatus(),
+        basic: basicRedisManager.getStatus(),
+        multi: multiCacheManager.getDetailedStatus()
+      }
+    });
+  } catch (error) {
+    console.error('[❌] Error in cache comparison:', error);
+    res.status(500).json({
+      error: 'Failed to compare cache implementations',
+      message: error.message
+    });
+  }
+});
+
+// Cleanup MultiCacheManager
+app.post('/multi-cache/cleanup', async (req, res) => {
+  try {
+    console.log('[🧹] Cleaning up MultiCacheManager...');
+    await multiCacheManager.cleanup();
+    
+    res.json({
+      message: 'MultiCacheManager cleaned up successfully'
+    });
+  } catch (error) {
+    console.error('[❌] Error cleaning up MultiCacheManager:', error);
+    res.status(500).json({
+      error: 'Failed to cleanup MultiCacheManager',
+      message: error.message
+    });
   }
 });
 
